@@ -1,0 +1,11 @@
+{
+  "name": "coydash · Ecossistema Coytech",
+  "short_name": "coydash",
+  "description": "Painel Executivo e Operacional do Ecossistema Coytech (Studio, Flow & Pulse)",
+  "start_url": "/executivo",
+  "display": "standalone",
+  "background_color": "#141414",
+  "theme_color": "#F0521F",
+  "orientation": "portrait"
+}
+

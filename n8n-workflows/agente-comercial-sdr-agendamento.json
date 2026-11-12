@@ -1,0 +1,386 @@
+{
+  "name": "CoyDash · Agente SDR Comercial & Agendamento de Reuniões",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-sdr-comercial",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "node-webhook-comercial",
+      "name": "1. Webhook Z-API (Ao receber)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-telefone",
+              "name": "telefone",
+              "value": "={{ $json.body?.phone || $json.body?.senderPhone || $json.body?.from || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fld-nome",
+              "name": "nome",
+              "value": "={{ $json.body?.senderName || $json.body?.contact?.name || 'Lead Comercial' }}",
+              "type": "string"
+            },
+            {
+              "id": "fld-mensagem",
+              "name": "mensagem",
+              "value": "={{ $json.body?.text?.message || $json.body?.message?.conversation || $json.body?.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fld-isGroup",
+              "name": "isGroup",
+              "value": "={{ $json.body?.isGroup || false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "fld-datahora",
+              "name": "hora_data_mensagem",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "id": "node-edit-fields-comercial",
+      "name": "2. Extrair Dados do Lead"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-not-group",
+              "leftValue": "={{ $json.isGroup }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-has-msg",
+              "leftValue": "={{ $json.mensagem.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "id": "node-if-valido-comercial",
+      "name": "3. Ignorar Grupos / Mensagem Vazia"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, lead_nome, human_takeover, commercial_stage, meeting_scheduled_at FROM public.leads WHERE lead_id = $1 LIMIT 1;",
+        "options": {
+          "queryParams": "={{ [$('2. Extrair Dados do Lead').item.json.telefone] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, -100],
+      "id": "node-consultar-lead",
+      "name": "4. Consultar Lead (Supabase Pooler 6543)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-lead-exists",
+              "leftValue": "={{ $json?.id ? true : false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, -100],
+      "id": "node-if-lead-existe",
+      "name": "5. Lead Já Existe?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.leads (lead_id, lead_nome, inbox_type, commercial_stage, human_takeover, created_at) VALUES ($1, $2, 'COMMERCIAL', 'NOVO', false, now()) ON CONFLICT (lead_id) DO NOTHING RETURNING id;",
+        "options": {
+          "queryParams": "={{ [$('2. Extrair Dados do Lead').item.json.telefone, $('2. Extrair Dados do Lead').item.json.nome] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 0],
+      "id": "node-criar-lead-comercial",
+      "name": "6. Criar Lead Comercial (Supabase)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('2. Extrair Dados do Lead').item.json.mensagem }}",
+        "options": {
+          "systemMessage": "Você é o consultor de pré-vendas (SDR) e agendamento comercial da Coytech via WhatsApp.\nSEU OBJETIVO: Qualificar leads com cordialidade e agendar uma reunião executiva estratégica online (Google Meet).\n\nDIRETRIZES DE OURO:\n1. Mantenha tom consultivo, empático e profissional. Escreva respostas curtas divididas em parágrafos separados por linha em branco (\\n\\n).\n2. Faça apenas UMA pergunta por vez: descubra a especialidade/nicho da empresa, se já investem em anúncios e qual a meta mensal de clientes.\n3. Quando o lead demonstrar interesse ou pedir valores, explique que na Reunião Estratégica Gratuita de 30 minutos é feito o diagnóstico e desenho do plano personalizado.\n4. Convide diretamente para o agendamento sugerindo dois horários (ex: 'Prefere amanhã às 14h ou às 16h30 para uma call rápida de 30 minutos?').\n5. Se o cliente pedir para falar com um humano ou negociar contrato, confirme educadamente que o executivo de contas foi notificado."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1360, -100],
+      "id": "node-ai-agent-sdr",
+      "name": "7. Agente IA SDR Comercial"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1360, 100],
+      "id": "node-model-openai-sdr",
+      "name": "OpenAI Chat Model (gpt-4o-mini)"
+    },
+    {
+      "parameters": {
+        "tableName": "n8n_chat_histories",
+        "sessionKey": "={{ $('2. Extrair Dados do Lead').item.json.telefone }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [1480, 100],
+      "id": "node-memory-postgres-sdr",
+      "name": "Postgres Chat Memory (Supabase Pooler 6543)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.output || '';\nconst parts = text.split(/\\n\\n+/).map(p => p.trim()).filter(Boolean);\nreturn parts.map(part => ({ json: { textPart: part } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, -100],
+      "id": "node-split-text-sdr",
+      "name": "8. Quebrar em Balões Curtos"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1900, -100],
+      "id": "node-wait-sdr",
+      "name": "9. Esperar 3 Segundos"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.z-api.io/instances/SUA_INSTANCIA_AQUI/token/SEU_TOKEN_AQUI/send-text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Client-Token",
+              "value": "SEU_CLIENT_TOKEN_ZAPI_AQUI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "phone",
+              "value": "={{ $('2. Extrair Dados do Lead').item.json.telefone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.textPart }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2120, -100],
+      "id": "node-send-zapi-sdr",
+      "name": "10. Enviar WhatsApp (Z-API)"
+    }
+  ],
+  "connections": {
+    "1. Webhook Z-API (Ao receber)": {
+      "main": [
+        [
+          {
+            "node": "2. Extrair Dados do Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Extrair Dados do Lead": {
+      "main": [
+        [
+          {
+            "node": "3. Ignorar Grupos / Mensagem Vazia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Ignorar Grupos / Mensagem Vazia": {
+      "main": [
+        [
+          {
+            "node": "4. Consultar Lead (Supabase Pooler 6543)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Consultar Lead (Supabase Pooler 6543)": {
+      "main": [
+        [
+          {
+            "node": "5. Lead Já Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Lead Já Existe?": {
+      "main": [
+        [
+          {
+            "node": "7. Agente IA SDR Comercial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6. Criar Lead Comercial (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Criar Lead Comercial (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "7. Agente IA SDR Comercial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (gpt-4o-mini)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "7. Agente IA SDR Comercial",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory (Supabase Pooler 6543)": {
+      "ai_memory": [
+        [
+          {
+            "node": "7. Agente IA SDR Comercial",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Agente IA SDR Comercial": {
+      "main": [
+        [
+          {
+            "node": "8. Quebrar em Balões Curtos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Quebrar em Balões Curtos": {
+      "main": [
+        [
+          {
+            "node": "9. Esperar 3 Segundos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Esperar 3 Segundos": {
+      "main": [
+        [
+          {
+            "node": "10. Enviar WhatsApp (Z-API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+
