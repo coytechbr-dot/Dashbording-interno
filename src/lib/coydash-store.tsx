@@ -809,12 +809,24 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) {
         setIsLoading(false)
+        if (res.status === 401 && typeof window !== 'undefined') {
+          const authPages = ['/login', '/cadastro', '/recuperar-senha', '/atualizar-senha']
+          if (!authPages.some((p) => window.location.pathname.startsWith(p))) {
+            window.location.href = '/login'
+          }
+        }
         return
       }
 
       const data = await res.json()
       if (!data.authenticated) {
         setIsLoading(false)
+        if (typeof window !== 'undefined') {
+          const authPages = ['/login', '/cadastro', '/recuperar-senha', '/atualizar-senha']
+          if (!authPages.some((p) => window.location.pathname.startsWith(p))) {
+            window.location.href = '/login'
+          }
+        }
         return
       }
 

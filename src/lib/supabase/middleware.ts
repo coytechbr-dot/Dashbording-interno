@@ -6,7 +6,28 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
+  const pathname = request.nextUrl.pathname
+
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
+
+  const publicRoutes = [
+    '/login',
+    '/cadastro',
+    '/recuperar-senha',
+    '/atualizar-senha',
+    '/auth/callback',
+  ]
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (!isPublicRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('message', 'Configure as variáveis do Supabase no painel da Vercel para conectar.')
+      return NextResponse.redirect(url)
+    }
     return supabaseResponse
   }
 
@@ -34,21 +55,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const pathname = request.nextUrl.pathname
-
-  if (pathname.startsWith('/api/')) {
-    return supabaseResponse
-  }
-
-  const publicRoutes = [
-    '/login',
-    '/cadastro',
-    '/recuperar-senha',
-    '/atualizar-senha',
-    '/auth/callback',
-  ]
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()

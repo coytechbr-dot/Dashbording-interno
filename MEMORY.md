@@ -566,3 +566,13 @@ Toda a interface do **CoyDash** segue estritamente o documento [`spec/DESIGN.md`
   6. Push bem-sucedido para `origin/main` configurando rastreamento upstream (`branch 'main' set up to track 'origin/main'`).
 - **Status:** **Deploy para o Repositório GitHub Concluído com Sucesso Absoluto**. Branch `main` sincronizada e atualizada.
 
+### [2026-11-12] — Sessão 20: Correção de Redirecionamento de Auth e Blindagem de Variáveis na Vercel
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Corrigir falha que permitia acesso ao dashboard interno na Vercel sem autenticação e sem dados quando as variáveis de ambiente do Supabase não estavam configuradas no painel da Vercel.
+- **Arquivos Modificados:**
+  - [`src/lib/supabase/middleware.ts`](./src/lib/supabase/middleware.ts): Mapeamento antecipado de rotas públicas e bloqueio estrito em caso de ausência de variáveis de ambiente (`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`), redirecionando automaticamente para `/login?message=Configure+as+variáveis...`.
+  - [`src/lib/coydash-store.tsx`](./src/lib/coydash-store.tsx): Fallback de redirecionamento no navegador para `/login` caso o endpoint `/api/coydash/sync` retorne status 401 ou `authenticated: false`, impedindo tela em branco/vazia sem login.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 20.
+- **Status:** **Concluído e Enviado para o Repositório GitHub**.
+
+
