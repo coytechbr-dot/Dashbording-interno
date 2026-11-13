@@ -657,4 +657,20 @@ Toda a interface do **CoyDash** segue estritamente o documento [`spec/DESIGN.md`
   - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
 - **Status:** **Concluído com Êxito**.
 
+### [2026-11-13] — Sessão 34: Sincronização e Push Completo para o Repositório GitHub Oficial (coytechbr-dot/Dashbording-interno)
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Atender à solicitação do usuário de enviar todas as atualizações mais recentes do aplicativo para o repositório remoto no GitHub.
+- **Resumo do Envio:**
+  - **Repositório:** `https://github.com/coytechbr-dot/Dashbording-interno.git` (Branch: `main`)
+  - **Commit:** `58765ad` (`feat: design system azul eletrico, dropdowns e pickers premium, ordens de servico e propostas comerciais`)
+  - **Estatísticas:** 65 arquivos alterados, 12.168 inserções e 2.650 exclusões.
+  - **Principais Módulos Enviados:**
+    1. Novo Design System oficial em Azul Elétrico `#0066FF`, eliminando o laranja de marca em mais de 30 arquivos.
+    2. Componentes Premium: `CoyDropdown` (com ícones temáticos e busca), `CoyDatePicker` (substituição dos seletores brutos do Windows), `CoyColorPicker` e `CoyAssigneePicker` (minipop com avatares, cargos e busca).
+    3. Sistema de Ordens de Serviço (O.S.) em 3 etapas com pop-up guiado e novo layout em linha contínua da aba Demandas do Cliente.
+    4. Geração de Propostas Comerciais a partir de leads de Atendimento (WhatsApp) e negócios do CRM Comercial com vínculo completo aos dados do cliente.
+    5. Estúdio Avançado de Campos Personalizados (`CustomFieldsStudioDialog`) com artes 3D e grupos pré-configurados.
+    6. Sistema de 5 níveis de permissão (`RBAC`) e arquivamento seguro de tarefas com trilha de auditoria.
+  - **Status:** **Sincronizado e Enviado com Sucesso Absoluto para a Branch main no GitHub**.
+
 
