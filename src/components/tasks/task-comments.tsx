@@ -134,7 +134,7 @@ export function TaskComments({
       {/* Formulário de Envio com Suporte a Áudio */}
       <form onSubmit={handleSubmit} className="mt-4 pt-3 border-t border-[var(--line)] flex flex-col gap-2.5">
         {recordedAudioUrl && (
-          <div className="flex items-center gap-2 p-2 rounded-xl bg-orange-500/10 border border-orange-500/20">
+          <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-500/10 border border-orange-500/20">
             <span className="text-[11.5px] font-medium text-orange-500">Áudio gravado:</span>
             <AudioPlayer src={recordedAudioUrl}>
               <button
@@ -172,7 +172,7 @@ export function TaskComments({
             <Button
               type="submit"
               disabled={!content.trim() && !recordedAudioUrl}
-              className="bg-[var(--color-brand-orange)] hover:bg-[var(--color-brand-orange-hover)] text-[#141414] rounded-full h-[34px] px-3 font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
+              className="bg-[var(--color-brand-blue)] hover:bg-[var(--color-brand-blue-hover)] text-white rounded-full h-[34px] px-3 font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Enviar</span>

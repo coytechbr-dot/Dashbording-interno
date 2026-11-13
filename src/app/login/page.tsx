@@ -3,7 +3,7 @@
 import React, { useActionState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -17,6 +17,7 @@ import {
 function LoginForm() {
   const searchParams = useSearchParams()
   const message = searchParams.get('message')
+  const prefilledEmail = searchParams.get('email') || ''
   const [state, formAction, isPending] = useActionState(login, null)
 
   return (
@@ -27,13 +28,18 @@ function LoginForm() {
           coydash
         </div>
 
-        <div className="my-auto flex flex-col gap-[28px] max-w-[400px] w-full mx-auto md:mx-0">
+        <div className="my-auto flex flex-col gap-[26px] max-w-[400px] w-full mx-auto md:mx-0">
           <div className="flex flex-col gap-[10px]">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[11px] font-semibold text-[#0066FF] w-fit">
+              <Lock className="w-3 h-3" />
+              <span>Plataforma Interna Coytech</span>
+            </div>
+
             <h1 className="font-semibold text-[42px] leading-[1.02] tracking-[-1.4px] text-balance">
               Que bom te ver de novo
             </h1>
             <p className="text-[14px] text-[var(--ds-muted)]">
-              Seus sistemas, automações e o monitoramento 24/7 estão ativos. Entre para acessar sua operação.
+              Entre com seu e-mail Coytech ou credenciais de membro cadastradas no sistema.
             </p>
           </div>
 
@@ -52,13 +58,14 @@ function LoginForm() {
 
           <form action={formAction} className="flex flex-col gap-[16px]">
             <label className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)]">
-              E-mail
+              E-mail de Acesso
               <Input
                 type="email"
                 name="email"
-                placeholder="voce@empresa.com.br"
+                defaultValue={prefilledEmail}
+                placeholder="nome@coytech.com.br"
                 required
-                className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--color-brand-blue)] text-[var(--fg)] rounded-[12px]"
+                className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] focus:border-[#0066FF] text-[var(--fg)] rounded-[12px]"
               />
             </label>
 
@@ -67,7 +74,7 @@ function LoginForm() {
                 <span>Senha</span>
                 <Link
                   href="/recuperar-senha"
-                  className="text-[12px] text-[var(--color-brand-blue)] hover:underline"
+                  className="text-[12px] text-[#0066FF] hover:underline font-medium"
                 >
                   Esqueci a senha
                 </Link>
@@ -76,61 +83,28 @@ function LoginForm() {
                 name="password"
                 placeholder="••••••••"
                 required
-                className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] text-[var(--fg)] rounded-[12px]"
+                className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] focus:border-[#0066FF] text-[var(--fg)] rounded-[12px]"
               />
             </label>
 
             <div className="flex flex-col gap-[14px] mt-2">
               <Button
-                className="w-full h-[50px] bg-[var(--color-brand-blue)] hover:bg-[var(--color-brand-blue-hover)] text-white rounded-full text-[14px] font-semibold flex justify-between items-center px-5 cursor-pointer shadow-sm"
+                className="w-full h-[50px] bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] rounded-full text-[14px] font-semibold flex justify-between items-center px-5 cursor-pointer shadow-sm transition-colors"
                 type="submit"
                 disabled={isPending}
               >
-                <span>{isPending ? 'Entrando...' : 'Entrar na operação'}</span>
+                <span>{isPending ? 'Autenticando...' : 'Entrar na operação'}</span>
                 <ArrowUpRight className="w-4 h-4" strokeWidth={2.5} />
               </Button>
-
-              <div className="flex items-center gap-[12px] text-[12px] text-[var(--ds-muted)]">
-                <span className="flex-1 h-[1px] bg-[var(--line2)]"></span>
-                ou continue com
-                <span className="flex-1 h-[1px] bg-[var(--line2)]"></span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-[10px]">
-                <button
-                  type="button"
-                  className="flex items-center justify-center gap-[10px] h-[48px] bg-[var(--surface)] hover:bg-[var(--line2)] rounded-full text-[13px] font-medium transition-colors border border-[var(--line2)] text-[var(--fg)]"
-                >
-                  <span className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[var(--fg)] flex items-center justify-center text-[10px] font-bold">
-                    G
-                  </span>
-                  Google
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center justify-center gap-[10px] h-[48px] bg-[var(--surface)] hover:bg-[var(--line2)] rounded-full text-[13px] font-medium transition-colors border border-[var(--line2)] text-[var(--fg)]"
-                >
-                  <span className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[var(--fg)] flex items-center justify-center text-[10px] font-bold">
-                    M
-                  </span>
-                  Microsoft
-                </button>
-              </div>
             </div>
           </form>
 
-          <div className="text-[13px] text-[var(--ds-muted)]">
-            Ainda não tem conta?{' '}
-            <Link
-              href="/cadastro"
-              className="text-[var(--color-brand-orange)] hover:underline font-medium"
-            >
-              Criar operação
-            </Link>
+          <div className="p-3.5 rounded-[12px] bg-[var(--surface)] border border-[var(--line)] text-[12px] text-[var(--ds-muted)] leading-relaxed">
+            Acesso restrito a colaboradores e parceiros autorizados. Caso precise de acesso ou alteração de senha, solicite diretamente a um membro administrador.
           </div>
         </div>
 
-        <div className="text-[11px] text-[var(--ds-muted)] mt-auto">© 2026 coydash</div>
+        <div className="text-[11px] text-[var(--ds-muted)] mt-auto">© 2026 coydash · Acesso Interno</div>
       </div>
 
       {/* Direita */}
@@ -160,17 +134,16 @@ function LoginForm() {
             <IllustrationFocusRoom />
           </div>
 
-          {/* Card 2 (Acento Azul Gradiente / Imagem) */}
-          <div className="absolute left-[180px] bottom-[70px] w-[210px] h-[280px] bg-accent-blue-card rounded-[14px] p-[18px] text-white flex flex-col overflow-hidden rotate-[3deg] shadow-[0_20px_40px_rgba(0,102,255,0.3)]">
-            <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+          {/* Card 2 (Laranja Oficial #0066FF) */}
+          <div className="absolute left-[180px] bottom-[70px] w-[210px] h-[280px] bg-[#0066FF] rounded-[14px] p-[18px] text-[#141414] flex flex-col overflow-hidden rotate-[3deg] shadow-[0_20px_40px_rgba(240,82,31,0.3)] z-10">
             <div className="flex justify-between items-center text-[11px] font-semibold relative z-10">
-              <span className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">02</span>
-              <span className="flex items-center gap-[5px] font-medium bg-black/40 backdrop-blur-md text-white rounded-full px-[8px] py-[3px] text-[10px] border border-white/20">
-                <span className="w-[6px] h-[6px] rounded-full bg-[#0066FF]"></span>
+              <span className="text-[#141414]/80">02</span>
+              <span className="flex items-center gap-[5px] font-medium bg-black/15 text-[#141414] rounded-full px-[8px] py-[3px] text-[10px]">
+                <span className="w-[6px] h-[6px] rounded-full bg-[#141414]"></span>
                 5 agentes IA
               </span>
             </div>
-            <div className="font-semibold text-[22px] leading-[1.05] tracking-[-0.4px] mt-[18px] relative z-10 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+            <div className="font-semibold text-[22px] leading-[1.05] tracking-[-0.4px] mt-[18px] relative z-10 text-[#141414]">
               Coytech
               <br />
               Flow

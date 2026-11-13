@@ -42,6 +42,8 @@ import {
 } from 'lucide-react'
 import { useCoyDash } from '@/lib/coydash-store'
 import { createClient as createBrowserSupabase } from '@/lib/supabase/client'
+import { createCommercialProposalTaskFromLead } from '@/lib/proposal-task-helper'
+import { CoyDatePicker } from '@/components/ui/coy-date-picker'
 
 interface LeadMemoryItem {
   id: string
@@ -229,7 +231,17 @@ function DoubleCheckSvg({ className = 'w-[14px] h-[10px]' }: { className?: strin
 function AtendimentoContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { currentOrg, refreshFromDatabase } = useCoyDash()
+  const {
+    currentOrg,
+    refreshFromDatabase,
+    taskFolders,
+    taskLists,
+    createTaskFolder,
+    createTaskList,
+    createTask,
+    authenticatedUser,
+    clients,
+  } = useCoyDash()
 
   // 1. MODO DE VISUALIZAÇÃO (CHAT | KANBAN | LIST)
   const [viewMode, setViewMode] = useState<'CHAT' | 'KANBAN' | 'LIST'>('CHAT')
@@ -255,6 +267,7 @@ function AtendimentoContent() {
   const [meetingLinkInput, setMeetingLinkInput] = useState('')
   const [isSavingMeeting, setIsSavingMeeting] = useState(false)
   const [isConvertingLead, setIsConvertingLead] = useState(false)
+  const [isRequestingProposal, setIsRequestingProposal] = useState(false)
   const [convertSuccessMsg, setConvertSuccessMsg] = useState<string | null>(null)
   const [newMemoryInput, setNewMemoryInput] = useState('')
 
@@ -718,6 +731,65 @@ function AtendimentoContent() {
       }
     } finally {
       setIsConvertingModalLead(false)
+    }
+  }
+
+  const handleRequestProposalFromLead = async (lead: LeadConversationItem) => {
+    setIsRequestingProposal(true)
+    try {
+      const msgsToInclude =
+        lead.lead_id === selectedSessionId
+          ? messages
+          : modalLead?.lead_id === lead.lead_id
+            ? modalMessages
+            : []
+
+      // Tenta associar ao cliente da base por ID ou por nome/telefone
+      const matchingClient = clients.find(
+        (c) =>
+          (lead.client_id && c.id === lead.client_id) ||
+          c.name.toLowerCase() === lead.lead_nome.toLowerCase() ||
+          (c.contact_phone && lead.lead_id && c.contact_phone.includes(lead.lead_id.replace(/\D/g, '')))
+      )
+
+      const finalClientName = matchingClient?.name || lead.lead_nome || 'Lead'
+      const finalClientId = lead.client_id || matchingClient?.id || undefined
+
+      const task = await createCommercialProposalTaskFromLead(
+        {
+          leadName: lead.lead_nome,
+          leadPhone: lead.lead_id,
+          companyName: matchingClient?.name || undefined,
+          clientId: finalClientId,
+          clientNameSnapshot: finalClientName,
+          requestingUserName: authenticatedUser?.name || 'Felipe Cavalcante',
+          notes: `Estágio Comercial: ${COMMERCIAL_STAGE_LABELS[lead.commercial_stage]?.label || lead.commercial_stage || 'Novo Lead'} · Score: ${lead.qualification_score ?? 50}/100`,
+          memories: lead.memories,
+          recentMessages: msgsToInclude.map((m) => ({
+            sender: m.sender_label || (m.type === 'human' ? 'Lead' : 'Robô'),
+            content: m.content,
+          })),
+          origin: 'Atendimento WhatsApp',
+        },
+        {
+          taskFolders,
+          taskLists,
+          createTaskFolder,
+          createTaskList,
+          createTask,
+          refreshFromDatabase,
+        }
+      )
+
+      if (task) {
+        const successMsg = `📄 Proposta comercial solicitada com sucesso! Tarefa criada em "Leads - Tarefas" -> "Proposta Comercial".`
+        setModalConvertSuccess(successMsg)
+        setConvertSuccessMsg(successMsg)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Falha ao solicitar proposta comercial')
+    } finally {
+      setIsRequestingProposal(false)
     }
   }
 
@@ -1493,11 +1565,12 @@ function AtendimentoContent() {
                       <label className="text-[10.5px] text-[var(--ds-muted)]">
                         Data e Horário
                       </label>
-                      <input
-                        type="datetime-local"
+                      <CoyDatePicker
                         value={meetingDateInput}
-                        onChange={(e) => setMeetingDateInput(e.target.value)}
-                        className="w-full h-[34px] px-[10px] rounded-[6px] bg-[var(--surface)] border border-[var(--line2)] text-[12px] focus:outline-none focus:border-[#0066FF]"
+                        onChange={setMeetingDateInput}
+                        includeTime={true}
+                        placeholder="Agendar data e hora..."
+                        className="w-full h-[34px] rounded-[6px]"
                       />
                     </div>
 
@@ -1543,6 +1616,21 @@ function AtendimentoContent() {
                       <span>{isSavingMeeting ? 'Salvando...' : 'Salvar Reunião'}</span>
                     </button>
                   </div>
+
+                  {/* Botão de Solicitar Proposta Comercial */}
+                  <button
+                    type="button"
+                    onClick={() => handleRequestProposalFromLead(activeConv)}
+                    disabled={isRequestingProposal}
+                    className="w-full h-[38px] px-[14px] rounded-[10px] bg-[var(--surface)] hover:bg-[#0066FF]/10 text-[#0066FF] border border-[#0066FF]/30 font-semibold text-[12px] flex items-center justify-center gap-[8px] cursor-pointer transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>
+                      {isRequestingProposal
+                        ? 'Solicitando Proposta...'
+                        : 'Solicitar Proposta Comercial'}
+                    </span>
+                  </button>
 
                   {/* Botão de Converter Lead em Cliente */}
                   <button
@@ -1740,17 +1828,31 @@ function AtendimentoContent() {
                                       <span>{(lead.memories || []).length} notas</span>
                                     </span>
 
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleGoToChat(lead)
-                                      }}
-                                      className="text-[#0066FF] hover:underline flex items-center gap-[3px] font-medium cursor-pointer"
-                                    >
-                                      <span>Abrir chat</span>
-                                      <ArrowUpRight className="w-3.5 h-3.5" />
-                                    </button>
+                                    <div className="flex items-center gap-[8px]">
+                                      <button
+                                        type="button"
+                                        title="Solicitar Proposta Comercial"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleRequestProposalFromLead(lead)
+                                        }}
+                                        className="p-[3px] rounded hover:bg-[var(--line)] text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer transition-colors"
+                                      >
+                                        <FileText className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleGoToChat(lead)
+                                        }}
+                                        className="text-[#0066FF] hover:underline flex items-center gap-[3px] font-medium cursor-pointer"
+                                      >
+                                        <span>Abrir chat</span>
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               )}
@@ -1920,6 +2022,17 @@ function AtendimentoContent() {
                             className="flex items-center justify-end gap-[8px]"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <button
+                              type="button"
+                              onClick={() => handleRequestProposalFromLead(lead)}
+                              disabled={isRequestingProposal}
+                              className="h-[28px] px-[10px] rounded-[6px] bg-[var(--surface)] hover:bg-[#0066FF]/10 text-[#0066FF] border border-[#0066FF]/30 text-[11px] font-semibold flex items-center gap-[4px] cursor-pointer transition-colors"
+                              title="Solicitar Proposta Comercial (cria tarefa em Leads - Tarefas)"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>Proposta</span>
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => handleGoToChat(lead)}
@@ -2208,11 +2321,12 @@ function AtendimentoContent() {
                     <label className="text-[10.5px] text-[var(--ds-muted)]">
                       Data e Horário
                     </label>
-                    <input
-                      type="datetime-local"
+                    <CoyDatePicker
                       value={modalMeetingDate}
-                      onChange={(e) => setModalMeetingDate(e.target.value)}
-                      className="w-full h-[34px] px-[10px] rounded-[6px] bg-[var(--surface)] border border-[var(--line2)] text-[12px] focus:outline-none focus:border-[#0066FF]"
+                      onChange={setModalMeetingDate}
+                      includeTime={true}
+                      placeholder="Agendar data e hora..."
+                      className="w-full h-[34px] rounded-[6px]"
                     />
                   </div>
 
@@ -2253,6 +2367,16 @@ function AtendimentoContent() {
                     </span>
                   </button>
                 </div>
+
+                {/* Botão de Solicitar Proposta Comercial */}
+                <button
+                  type="button"
+                  onClick={() => modalLead && handleRequestProposalFromLead(modalLead)}
+                  className="w-full h-[38px] px-[14px] rounded-[10px] bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] hover:border-[#0066FF]/60 text-[var(--fg)] font-bold text-[12px] flex items-center justify-center gap-[6px] cursor-pointer transition-colors shadow-xs"
+                >
+                  <FileText className="w-4 h-4 text-[#0066FF]" />
+                  <span>Solicitar Proposta Comercial</span>
+                </button>
 
                 {/* Botão de Converter em Cliente */}
                 <button

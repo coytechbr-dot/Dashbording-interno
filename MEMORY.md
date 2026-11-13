@@ -17,15 +17,51 @@ Sempre que um agente assumir ou operar neste workspace, ele **DEVE** seguir esta
    - Atualizar a seção **Estado Atual e Próximo Passo Imediato (Seção 2)**;
    - Marcar `[x]` na respectiva task em [`TASKS.md`](./TASKS.md).
 4. **Validação Técnica Pré-Entrega:** Sempre rodar `npx tsc --noEmit` para garantir 0 erros de TypeScript antes de finalizar.
-5. **Idioma e Padrão:** Sempre responder ao usuário em **Português**, manter 100% de fidelidade à nomenclatura oficial da Coytech e **nunca alterar nada do Design System do projeto `ROOMIE OFFICE AI` ([`spec/DESIGN.md`](./spec/DESIGN.md))**.
+5. **Idioma e Padrão:** Sempre responder ao usuário em **Português**, manter 100% de fidelidade à nomenclatura oficial da Coytech e seguir rigorosamente o Design System do CoyDash ([`spec/DESIGN.md`](./spec/DESIGN.md)): único acento oficial **Azul Elétrico `#0066FF`** (hover `#0052CC`), botões com texto branco `#FFFFFF`, dropdowns premium estilizados (`CoyDropdown`) com ícones temáticos de tarefas e modais com backdrop blur (`bg-black/60 backdrop-blur-sm`). Nunca utilizar laranja como acento de marca.
 
 ---
 
 ## 📍 2. Estado Atual do Projeto & Próximo Passo Imediato
 
 - **Repositório GitHub Oficial:** `https://github.com/coytechbr-dot/Dashbording-interno` (Branch: `main`)
-- **Fase Atual:** `FASE 13 CONCLUÍDA & CÓDIGO SINCRONIZADO NO GITHUB: 100% das Tasks Entregues (TASK-13.1 até 13.8), Build de Produção Aprovado (34/34 rotas), 0 Erros de TypeScript, MCP Universal Ativo e Repositório GitHub Oficial Sincronizado na Branch main`
+- **Fase Atual:** `FASE 19 CONCLUÍDA: Vinculação Completa de Dados do Cliente e Auto-Atribuição no Modo Eu nas Tarefas de Proposta Comercial de Leads`
 - **Últimas Entregas Concluídas:**
+  -8. **Layout Unificado da Lista de Demandas do Cliente em Linha Contínua (`ClientDemandsTab`):**
+     - **Padronização Visual com a Lista de Subtarefas:** Eliminação dos cards dispersos e substituição por container único com cantos suaves `rounded-2xl`, borda sutil `border-[var(--line2)]` e divisórias `divide-y divide-[var(--line)]`.
+     - **Linha Horizontal Contínua e Interativa:**
+       - **Extrema Esquerda:** Botão de checkbox circular interativo com check animado ao alternar entre "A Fazer" e "Concluído", com feedback visual imediato.
+       - **Título:** Tipografia limpa com peso semibold `text-[13px]`, hover suave em Azul Elétrico `#0066FF` e suporte a abertura rápida no modal `TaskDialog`.
+       - **Extrema Direita (Metadados em Pílulas):**
+         - Badge de Status estilizado com cor dinâmica e fundo semitransparente (`A FAZER`, `EM ANDAMENTO`, `CONCLUÍDO`).
+         - Badge de Prioridade com ícone de bandeirinha preenchida `Flag` semântica (`Urgente`, `Alta`, `Média`, `Baixa`).
+         - Círculos de avatares sobrepostos com as iniciais de cada responsável atribuído (`[C][C]`).
+         - Data de vencimento formatada em tipografia mono (`AAAA-MM-DD`).
+         - Ícone de seta para abrir tarefa no pop-up completo (`ArrowUpRight` / `↗`).
+     - **Alternador de Modos Refinado:** Alternância intuitiva entre "Lista de Tarefas" (linha contínua) e "Kanban Embutido" com contadores dinâmicos de O.S. (Total, Em Andamento, Concluídas).
+  -7. **Seletor de Responsáveis em Minipop (`CoyAssigneePicker`) com Foto, Nome, Cargo e Setor:**
+     - **Componente Premium de Atribuição (`src/components/ui/coy-assignee-picker.tsx`):** Minipop baseado no Base UI Popover flutuante (`rounded-2xl shadow-2xl p-3 bg-[var(--surface)]`) com busca rápida por nome, cargo ou setor, exibindo cada colaborador com avatar circular gradiente com iniciais, nome completo em negrito, cargo/especialidade e selo de setor, com check ativo em Azul Elétrico `#0066FF`. Suporta seleção múltipla (tarefas) e seleção única (deals e campos individuais).
+     - **Padronização nas Telas:**
+       - `TaskDialog` (Modal amplo de tarefas): seleção e visualização de múltiplos responsáveis.
+       - `OrderServiceDialog` (Emissão guiada de O.S.): atribuição na Etapa 2 de prazos e equipe.
+       - `DealDialog` (Oportunidades do Comercial): seleção de Closer/Responsável em substituição ao `<select>` nativo.
+       - `TaskCustomFields`: seleção para campos personalizados do tipo `user`.
+  -6. **Componentes Premium de Data/Hora (`CoyDatePicker`), Seletor de Cores (`CoyColorPicker`) & Estilização Global de Inputs:**
+     - **Componente Premium de Seleção de Data & Hora (`src/components/ui/coy-date-picker.tsx`):** Substituição definitiva dos inputs nativos `<input type="date">` e `<input type="datetime-local">` que abriam a janela branca e sem estilo do Windows/WebKit. Implementado com Popover Base UI flutuante (`bg-[var(--surface)] border border-[var(--line2)] shadow-2xl rounded-2xl`), seleção em Azul Elétrico `#0066FF`, dias da semana e meses em Português, atalhos rápidos ("Hoje", "Amanhã", "+3 dias", "+1 semana", "Limpar") e suporte integrado a horário (`includeTime`).
+     - **Componente Premium de Cores (`src/components/ui/coy-color-picker.tsx`):** Substituição do `<input type="color">` cru por seletor com a paleta oficial do CoyDash (Azul, Verde, Âmbar, Lilás, Vermelho, etc.) e input hexadecimal estilizado.
+     - **Harmonização Global em `@layer base` (`src/app/globals.css`):** Aplicação de `color-scheme: dark` / `light`, estilização do indicador de calendário com `filter` e `opacity`, e padronização de checkboxes e radios com `accent-color: #0066FF`.
+     - **Substituição em Todos os Módulos:** Aplicado em `OrderServiceDialog`, `DealDialog`, `Atendimento` (gaveta e modal), `Colaboradores` (nascimento e admissão), `Clientes` (agenda) e `TasksWorkspaceView` (colunas de status).
+  -5. **Sistema de Ordens de Serviço (O.S.) para Clientes, Novo Layout de Demandas com Kanban Embutido e Propostas para Leads:**
+     - **Estrutura Automática de Projetos & Listas (`src/lib/task-lists-helper.ts`):** Helper idempotente que assegura as pastas `Clientes - Tarefas` (com a lista `Ordens de Serviço`) e `Leads - Tarefas` (com a lista `Proposta Comercial`) sob demanda, com retorno seguro de ID em `createTaskFolder` e `createTaskList`.
+     - **Emissor de Ordem de Serviço em 3 Etapas (`src/components/clients/order-service-dialog.tsx`):** Pop-up guiado (Stepper) acessível diretamente da Ficha 360º do Cliente (aba Demandas), cobrindo: 1. Briefing & Setor (com dropdown estilizado `CoyDropdown` e lista de destino), 2. Prazos, Responsáveis e Checklist de Subtarefas/Entregáveis, 3. Resumo Executivo e Emissão com 1 clique vinculada ao cliente e lista de O.S.
+     - **Novo Layout da Aba "Demandas" do Cliente (`src/components/clients/client-demands-tab.tsx`):** Substituição do antigo input básico por dashboard rico com métricas consolidadas (Total, Em Andamento, Concluídas), visualização dupla via abas (Lista com Cards Ricos vs. Quadro Kanban Embutido dentro da própria Ficha 360º), atalho para abrir no Kanban Geral e integração com `TaskDialog`.
+     - **Solicitação de Proposta Comercial a partir de Leads (`src/lib/proposal-task-helper.ts`):** Compilador inteligente que extrai dados de contato, notas, memórias registradas e últimas mensagens do lead (Atendimento WhatsApp e CRM Comercial), gerando automaticamente a tarefa na lista `Leads - Tarefas -> Proposta Comercial` com checklist estruturado de elaboração de proposta.
+     - **Ações Rápidas no Atendimento e CRM:** Botão de solicitar proposta integrado na gaveta de chat ativa (`activeConv`), no modal de detalhes do lead, no card do Kanban e na tabela CRM de `/atendimento`, e no card de negócios (`DealCard`) de `/comercial`.
+     - **Governança RBAC (`spec/coydash_funcionalidades_e_permissoes.md` e `src/lib/access-control.ts`):** Catalogadas as novas chaves `clients.create_order_service`, `clients.view_demands_kanban` e `leads.request_commercial_proposal`.
+  -4. **Dropdowns Premium (`CoyDropdown`), Janelas Modais Estilizadas & Padronização Global em Azul Elétrico (`#0066FF`):**
+     - **Componente Premium de Dropdowns (`src/components/ui/coy-dropdown.tsx`):** Substituição definitiva dos selects nativos brutos do sistema operacional por dropdowns com trigger em pílula moderna, indicador/badge, chevron animado, popover suspenso flutuante (`shadow-2xl rounded-xl border border-[var(--line2)]`), busca integrada automática para listas com mais de 5 itens e ícones temáticos para cada opção (ícones de tarefas, fases, tráfego, design, implantação, clientes e prioridades coloridas).
+     - **Visão de Tarefas & Kanban (`src/components/tasks/tasks-workspace-view.tsx`):** Eliminação dos selects feios da barra superior (Filtro de Listas/Setores, Filtro de Clientes e Filtro de Prioridades), substituídos por `CoyDropdown` com ícones semânticos e contadores reais de tarefas ativas.
+     - **Janelas Modais Imersivas (`src/components/ui/dialog.tsx`):** Elevação visual do overlay para `bg-black/60 backdrop-blur-sm` e cantos suaves `rounded-2xl border border-[var(--line2)] shadow-2xl`, acabando com as janelas "transparentes/sem estilo" soltas na tela.
+     - **Padronização Global do Design System em Azul Elétrico (`#0066FF`):** Mapeamento e eliminação do laranja de marca em mais de 30 arquivos do projeto, com botões primários em azul elétrico e texto branco `#FFFFFF`, foco em azul com anel suave, e atualização de `spec/DESIGN.md`, `AGENTS.md`, `GEMINI.md` e `MEMORY.md`.
   0. **Deploy e Sincronização no Repositório GitHub Oficial (`coytechbr-dot/Dashbording-interno`):**
      - Inicialização do repositório Git com branch principal `main`.
      - Blindagem rigorosa de credenciais: `.env.local` e `sb senha.txt` protegidos e ignorados, e criação do modelo limpo [`.env.example`](./.env.example).
@@ -574,5 +610,51 @@ Toda a interface do **CoyDash** segue estritamente o documento [`spec/DESIGN.md`
   - [`src/lib/coydash-store.tsx`](./src/lib/coydash-store.tsx): Fallback de redirecionamento no navegador para `/login` caso o endpoint `/api/coydash/sync` retorne status 401 ou `authenticated: false`, impedindo tela em branco/vazia sem login.
   - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 20.
 - **Status:** **Concluído e Enviado para o Repositório GitHub**.
+
+### [2026-11-13] — Sessão 32: Unificação do Layout de Demandas do Cliente em Linha Contínua (Idêntico ao Padrão de Subtarefas do TaskDialog)
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Atender à solicitação do usuário de unificar e reformular visualmente a lista de demandas na aba do cliente (`ClientDemandsTab`), substituindo os cards grandes e desconexos por um layout único em linha contínua, idêntico à lista de subtarefas do modal `TaskDialog`.
+- **Arquivos Modificados:**
+  - [`src/components/clients/client-demands-tab.tsx`](./src/components/clients/client-demands-tab.tsx):
+    - Substituição do layout de cards verticais dispersos por um container unificado `rounded-2xl border border-[var(--line2)] bg-[var(--surface)] overflow-hidden divide-y divide-[var(--line)] shadow-xs`.
+    - Cada demanda agora é exibida em uma linha compacta contínua com:
+      - **Checkbox Circular:** Círculo interativo com check dinâmico para alternar o status da tarefa entre concluída e pendente com feedback visual imediato.
+      - **Título:** Peso `font-semibold text-[13px]`, texto riscado quando concluída e hover em Azul Elétrico `#0066FF`.
+      - **Pill de Status:** Pílula com fundo semitransparente dinâmico (`${statusColor}15`) e borda suave (`${statusColor}40`).
+      - **Pill de Prioridade com Bandeira:** Ícone `Flag` preenchido com as cores semânticas oficiais do CoyDash (`#EF4444`, `#F59E0B`, `#3B82F6`, `#94A3B8`).
+      - **Avatares Sobrepostos:** Iniciais dos responsáveis atribuídos em círculos escuros compactos (`[C][C]`).
+      - **Data de Vencimento:** Data em tipografia monospace (`font-mono text-[11px]`).
+      - **Ícone de Abertura:** Seta suave `ArrowUpRight` (`↗`) que destaca em azul ao passar o mouse.
+    - Suporte a clique direto na linha para abrir o modal de edição `TaskDialog`.
+    - Atualização do Kanban Embutido para utilizar a mesma configuração de cores e ícones de prioridade (`PRIORITY_CONFIG`).
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 32 e atualização da Fase 18.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-13] — Sessão 33: Resolução de Visibilidade no Modo Eu e Vinculação de Dados do Cliente nas Tarefas de Proposta Comercial
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Atender à solicitação do usuário de corrigir a exibição das tarefas de Proposta Comercial na lista `Leads - Tarefas -> Proposta Comercial`, garantindo que caiam com todos os dados do cliente (badge visual do cliente no card, vínculo ao cadastro de clientes, dados estruturados no briefing e visibilidade imediata no Kanban mesmo com o filtro "Modo Eu" ativo).
+- **Diagnóstico do Problema:**
+  - As tarefas estavam sendo salvas no Supabase com sucesso (indicado pelo badge "3" na barra lateral), porém com `client_name_snapshot: ''` e `assignee_name: 'Comercial'`.
+  - Como a visualização da tela inicial de Kanban vem com o **"Modo Eu ATIVO"** por padrão, e o usuário autenticado não estava na lista de responsáveis (`assignees`), o filtro do Kanban ocultava as tarefas (colunas marcando `0`).
+- **Arquivos Modificados:**
+  - [`src/lib/proposal-task-helper.ts`](./src/lib/proposal-task-helper.ts):
+    - Ampliação de `ProposalLeadInput` com `clientId`, `clientNameSnapshot`, `requestingUserName` e `closerName`.
+    - Vínculo direto de `client_name_snapshot` (nome da empresa ou do lead) e `client_id` (se houver cliente cadastrado).
+    - Inclusão automática do usuário solicitante (`requestingUserName`), closer e setor Comercial em `assignees`, garantindo visibilidade imediata com o "Modo Eu" ativo.
+    - Briefing executivo com seção destacada `🏢 DADOS DO CLIENTE / LEAD`.
+  - [`src/app/comercial/page.tsx`](./src/app/comercial/page.tsx):
+    - Passagem de `clientId`, `clientNameSnapshot`, `closerName` e `requestingUserName` (`authenticatedUser.name`).
+  - [`src/app/atendimento/page.tsx`](./src/app/atendimento/page.tsx):
+    - Busca inteligente de cliente correspondente em `clients` por ID, nome ou telefone e passagem de `clientNameSnapshot`, `clientId` e `requestingUserName`.
+  - [`src/lib/task-utils.ts`](./src/lib/task-utils.ts):
+    - Regra no "Modo Eu" (`isTaskAssignedToUser`) para que membros de gestão/direção e do setor comercial visualizem tarefas atribuídas a 'Comercial' ou 'Equipe'.
+  - **Banco de Dados Supabase (Remoto):**
+    - Atualizadas as 3 tarefas existentes de Proposta Comercial com `client_name_snapshot`, `assignees: ['Felipe Cavalcante', 'Comercial', 'Coytech']` e `status_key: 'A FAZER'`, tornando-as visíveis no Kanban imediatamente.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 33 e atualização da Fase 19.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
 
 

@@ -173,7 +173,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-[16px] bg-[var(--surface)] border border-[var(--line2)]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#F0521F]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#0066FF]" />
             <span className="text-[11.5px] font-semibold tracking-wider uppercase text-[var(--ds-muted)]">
               Model Context Protocol (MCP) & Governança de IA
             </span>
@@ -189,7 +189,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] bg-[#F0521F] text-white font-semibold text-[13px] hover:opacity-90 transition-opacity shadow-lg shadow-[#F0521F]/20 cursor-pointer self-start md:self-auto shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] bg-[#0066FF] text-white font-semibold text-[13px] hover:opacity-90 transition-opacity shadow-lg shadow-[#0066FF]/20 cursor-pointer self-start md:self-auto shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Novo Token de IA</span>
@@ -201,7 +201,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
         <div className="p-4 rounded-[14px] bg-[var(--surface)] border border-[var(--line2)] flex flex-col gap-1">
           <div className="flex items-center justify-between text-[var(--ds-muted)] text-[12px]">
             <span>Endpoint MCP Oficial</span>
-            <Terminal className="w-4 h-4 text-[#F0521F]" />
+            <Terminal className="w-4 h-4 text-[#0066FF]" />
           </div>
           <div className="text-[13px] font-mono font-semibold text-[var(--fg)] truncate mt-1">
             POST /api/mcp
@@ -237,7 +237,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
       <div className="rounded-[16px] bg-[var(--surface)] border border-[var(--line2)] overflow-hidden">
         <div className="p-4 border-b border-[var(--line2)] flex items-center justify-between">
           <h3 className="text-[14px] font-bold text-[var(--fg)] flex items-center gap-2">
-            <Key className="w-4 h-4 text-[#F0521F]" />
+            <Key className="w-4 h-4 text-[#0066FF]" />
             <span>Chaves de Acesso Cadastradas</span>
           </h3>
           <button
@@ -264,7 +264,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="mt-2 inline-flex items-center gap-2 px-3.5 py-2 rounded-[10px] bg-[#F0521F] text-white font-semibold text-[12.5px] cursor-pointer"
+              className="mt-2 inline-flex items-center gap-2 px-3.5 py-2 rounded-[10px] bg-[#0066FF] text-white font-semibold text-[12.5px] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Criar Primeiro Token</span>
@@ -298,7 +298,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                     >
                       <td className="py-3.5 px-4 font-semibold text-[var(--fg)]">
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-[#F0521F]" />
+                          <span className="w-2 h-2 rounded-full bg-[#0066FF]" />
                           <span>{tok.name}</span>
                         </div>
                       </td>
@@ -316,7 +316,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                       <td className="py-3.5 px-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {scopes.includes('*') ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10.5px] font-medium bg-[#F0521F]/10 text-[#F0521F]">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10.5px] font-medium bg-[#0066FF]/10 text-[#0066FF]">
                               Acesso Total (*)
                             </span>
                           ) : (
@@ -386,12 +386,12 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
       {/* GUIA DE CONEXÃO RÁPIDA (CLAUDE DESKTOP & CURSOR) */}
       <div className="p-5 rounded-[16px] bg-[var(--surface)] border border-[var(--line2)] flex flex-col gap-3">
         <h3 className="text-[14px] font-bold text-[var(--fg)] flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-[#F0521F]" />
+          <Terminal className="w-4 h-4 text-[#0066FF]" />
           <span>Como Conectar no Claude Desktop ou Cursor</span>
         </h3>
         <p className="text-[12.5px] text-[var(--ds-muted)] leading-relaxed">
           Copie a configuração abaixo no arquivo de configuração do Claude Desktop (
-          <code className="text-[#F0521F] bg-[var(--line2)] px-1 py-0.5 rounded">claude_desktop_config.json</code>
+          <code className="text-[#0066FF] bg-[var(--line2)] px-1 py-0.5 rounded">claude_desktop_config.json</code>
           ) substituindo a variável de ambiente pelo seu token de IA:
         </p>
 
@@ -449,7 +449,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                     />
                     <button
                       onClick={handleCopyKey}
-                      className="px-3 py-1.5 rounded-[8px] bg-[#F0521F] text-white font-semibold text-[12px] flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                      className="px-3 py-1.5 rounded-[8px] bg-[#0066FF] text-white font-semibold text-[12px] flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
                     >
                       {hasCopiedKey ? (
                         <>
@@ -480,7 +480,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
               <form onSubmit={handleCreateToken} className="flex flex-col gap-4">
                 <div className="flex items-center justify-between pb-3 border-b border-[var(--line2)]">
                   <div className="flex items-center gap-2">
-                    <Key className="w-5 h-5 text-[#F0521F]" />
+                    <Key className="w-5 h-5 text-[#0066FF]" />
                     <h3 className="text-lg font-bold text-[var(--fg)]">Gerar Token de IA (MCP)</h3>
                   </div>
                   <button
@@ -503,7 +503,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                     placeholder="Ex: Claude Desktop Local, Agente Comercial N8N..."
                     value={tokenName}
                     onChange={(e) => setTokenName(e.target.value)}
-                    className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#F0521F]"
+                    className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#0066FF]"
                   />
                 </div>
 
@@ -514,7 +514,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                     <select
                       value={tokenRole}
                       onChange={(e) => setTokenRole(e.target.value as McpRole)}
-                      className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#F0521F]"
+                      className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#0066FF]"
                     >
                       <option value="OPERATOR">Operador (Padrão)</option>
                       <option value="READ_ONLY">Somente Leitura</option>
@@ -528,7 +528,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                     <select
                       value={expiresInDays}
                       onChange={(e) => setExpiresInDays(e.target.value)}
-                      className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#F0521F]"
+                      className="px-3 py-2 rounded-[10px] bg-[var(--surface-subtle)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none focus:border-[#0066FF]"
                     >
                       <option value="30">30 Dias</option>
                       <option value="90">90 Dias (Recomendado)</option>
@@ -554,14 +554,14 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                           onClick={() => toggleScope(scope)}
                           className={`flex items-start gap-2 p-2.5 rounded-[10px] text-left transition-all border cursor-pointer ${
                             isSelected
-                              ? 'bg-[#F0521F]/10 border-[#F0521F]/40 text-[var(--fg)]'
+                              ? 'bg-[#0066FF]/10 border-[#0066FF]/40 text-[var(--fg)]'
                               : 'bg-[var(--surface)] border-[var(--line2)] text-[var(--ds-muted)] hover:border-[var(--line)]'
                           }`}
                         >
                           <div
                             className={`w-4 h-4 rounded-[4px] mt-0.5 flex items-center justify-center border shrink-0 ${
                               isSelected
-                                ? 'bg-[#F0521F] border-[#F0521F] text-white'
+                                ? 'bg-[#0066FF] border-[#0066FF] text-white'
                                 : 'border-[var(--line2)]'
                             }`}
                           >
@@ -570,7 +570,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                           <div className="flex flex-col">
                             <span className="text-[12px] font-semibold leading-tight">{label}</span>
                             <span className="text-[10px] text-[var(--ds-muted)] mt-0.5">
-                              {module} • <code className="text-[#F0521F]">{scope}</code>
+                              {module} • <code className="text-[#0066FF]">{scope}</code>
                             </span>
                           </div>
                         </button>
@@ -591,7 +591,7 @@ export function McpTokensTab({ organizationId }: { organizationId: string }) {
                   <button
                     type="submit"
                     disabled={isCreating}
-                    className="px-4 py-2 rounded-[10px] bg-[#F0521F] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer shadow-lg shadow-[#F0521F]/20"
+                    className="px-4 py-2 rounded-[10px] bg-[#0066FF] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer shadow-lg shadow-[#0066FF]/20"
                   >
                     {isCreating ? 'Gerando Hash...' : 'Criar Token com Hash SHA-256'}
                   </button>

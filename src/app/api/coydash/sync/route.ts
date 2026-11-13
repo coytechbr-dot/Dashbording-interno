@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  isCoytechMasterEmail,
+  normalizeAccessType,
+  hasFeaturePermission,
+  canUserDeleteTask,
+  canUserArchiveTask,
+  type UserPermissionContext,
+} from '@/lib/access-control'
 
 function slugify(text: string) {
   return (
@@ -108,8 +116,17 @@ export async function GET(request: NextRequest) {
 
     let orgIds = (memberships || []).map((m) => m.organization_id)
 
-    // Se o usuário ainda não tem organização, cria uma organização limpa automaticamente
+    // Se o usuário ainda não tem organização, só cria automaticamente se for e-mail oficial Coytech
     if (orgIds.length === 0) {
+      if (!isCoytechMasterEmail(user.email)) {
+        return NextResponse.json(
+          {
+            authenticated: false,
+            error: 'Acesso restrito: este e-mail não possui permissão de membro interno.',
+          },
+          { status: 403 }
+        )
+      }
       const orgName = (companyMeta && companyMeta.trim()) || `Operação ${fullName.split(' ')[0]}`
       const slug = `${slugify(orgName)}-${Math.random().toString(36).slice(2, 6)}`
       const qbrDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -210,6 +227,7 @@ export async function GET(request: NextRequest) {
       { data: orgMembers },
       { data: hrNotes },
       { data: customFieldDefs },
+      { data: customFieldGroups },
       { data: pipelines },
       { data: pipelineStages },
       { data: deals },
@@ -342,6 +360,12 @@ export async function GET(request: NextRequest) {
         .from('custom_field_definitions')
         .select('*')
         .eq('organization_id', orgId)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true }),
+      admin
+        .from('custom_field_groups')
+        .select('*')
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: true }),
       admin
         .from('pipelines')
@@ -390,7 +414,7 @@ export async function GET(request: NextRequest) {
             organization_id: orgId,
             name: '🚀 Novos Clientes Coytech',
             is_default: true,
-            color: '#F0521F',
+            color: '#0066FF',
           })
           .select('*')
           .single()
@@ -401,7 +425,7 @@ export async function GET(request: NextRequest) {
             { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Novo Lead / Diagnóstico', stage_order: 0, probability_percent: 10, color: '#38bdf8', is_won: false, is_lost: false },
             { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Qualificação & BIA', stage_order: 1, probability_percent: 25, color: '#e8c14a', is_won: false, is_lost: false },
             { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Reunião de Apresentação', stage_order: 2, probability_percent: 50, color: '#8f7dff', is_won: false, is_lost: false },
-            { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Proposta Enviada', stage_order: 3, probability_percent: 75, color: '#f0521f', is_won: false, is_lost: false },
+            { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Proposta Enviada', stage_order: 3, probability_percent: 75, color: '#0066FF', is_won: false, is_lost: false },
             { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Contrato Fechado', stage_order: 4, probability_percent: 100, color: '#2f9e5a', is_won: true, is_lost: false },
             { organization_id: orgId, pipeline_id: createdPipe.id, name: 'Perdido / Desqualificado', stage_order: 5, probability_percent: 0, color: '#ef4444', is_won: false, is_lost: true },
           ]
@@ -423,12 +447,21 @@ export async function GET(request: NextRequest) {
       },
       currentMemberPermissions: {
         role: activeMembership?.role || 'CLIENT_CEO_DIRECTOR',
-        access_type: activeMembership?.access_type || 'MEMBER',
+        access_type: normalizeAccessType(
+          activeMembership?.access_type,
+          activeMembership?.role,
+          user.email
+        ),
         sector: activeMembership?.sector || 'Geral',
         job_title: activeMembership?.job_title || 'Colaborador',
         allowed_screens: activeMembership?.allowed_screens || [],
         allowed_folder_ids: activeMembership?.allowed_folder_ids || [],
         allowed_list_ids: activeMembership?.allowed_list_ids || [],
+        custom_permissions:
+          activeMembership?.custom_permissions &&
+          typeof activeMembership.custom_permissions === 'object'
+            ? activeMembership.custom_permissions
+            : {},
       },
       organizations: organizations || [],
       activeOrgId: orgId,
@@ -457,6 +490,7 @@ export async function GET(request: NextRequest) {
       orgMembers: orgMembers || [],
       hrNotes: hrNotes || [],
       customFieldDefs: customFieldDefs || [],
+      customFieldGroups: customFieldGroups || [],
       pipelines: finalPipelines,
       pipelineStages: finalStages,
       deals: deals || [],
@@ -488,6 +522,33 @@ export async function POST(request: NextRequest) {
       (user.user_metadata?.full_name as string) ||
       user.email?.split('@')[0] ||
       'Usuário'
+
+    let actorMemberRow: Record<string, unknown> | null = null
+    if (orgId) {
+      const { data: mRow } = await admin
+        .from('organization_members')
+        .select('role, access_type, custom_permissions')
+        .eq('organization_id', orgId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      actorMemberRow = (mRow as Record<string, unknown>) || null
+    }
+
+    const actorCtx: UserPermissionContext = {
+      userId: user.id,
+      email: user.email,
+      name: actorName,
+      role: (actorMemberRow?.role as string) || null,
+      access_type: (actorMemberRow?.access_type as string) || null,
+      custom_permissions:
+        actorMemberRow?.custom_permissions &&
+        typeof actorMemberRow.custom_permissions === 'object'
+          ? (actorMemberRow.custom_permissions as Record<string, boolean>)
+          : {},
+    }
+
+    const denyPerm = (msg: string) =>
+      NextResponse.json({ error: msg }, { status: 403 })
 
     switch (action) {
       case 'CREATE_ORG': {
@@ -727,6 +788,9 @@ export async function POST(request: NextRequest) {
       // SETORES, PROJETOS E TAREFAS (SISTEMA DO ROOMIE OFFICE AI)
       // =====================================================================
       case 'CREATE_TASK_FOLDER': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_structure')) {
+          return denyPerm('Seu nível de acesso não permite criar pastas de setor.')
+        }
         const folderName = String(payload.name || '').trim()
         if (!folderName) {
           return NextResponse.json({ error: 'Nome da pasta obrigatório' }, { status: 400 })
@@ -771,11 +835,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'DELETE_TASK_FOLDER': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_structure')) {
+          return denyPerm('Seu nível de acesso não permite excluir pastas de setor.')
+        }
         await admin.from('task_folders').delete().eq('id', payload.folderId)
         return NextResponse.json({ ok: true })
       }
 
       case 'CREATE_TASK_LIST': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_structure')) {
+          return denyPerm('Seu nível de acesso não permite criar listas de projetos.')
+        }
         const listName = String(payload.name || '').trim()
         const folderId = String(payload.folder_id || '')
         if (!listName || !folderId) {
@@ -851,11 +921,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'DELETE_TASK_LIST': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_structure')) {
+          return denyPerm('Seu nível de acesso não permite excluir listas de projetos.')
+        }
         await admin.from('task_lists').delete().eq('id', payload.listId)
         return NextResponse.json({ ok: true })
       }
 
       case 'CREATE_TASK_STATUS': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_columns')) {
+          return denyPerm('Seu nível de acesso não permite gerenciar colunas Kanban.')
+        }
         const { data, error } = await admin
           .from('task_statuses')
           .insert({
@@ -889,22 +965,28 @@ export async function POST(request: NextRequest) {
       }
 
       case 'DELETE_TASK_STATUS_COLUMN': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.manage_columns')) {
+          return denyPerm('Seu nível de acesso não permite excluir colunas Kanban.')
+        }
         await admin.from('task_statuses').delete().eq('id', payload.statusId)
         return NextResponse.json({ ok: true })
       }
 
       case 'CREATE_TASK': {
+        if (!hasFeaturePermission(actorCtx, 'tasks.create')) {
+          return denyPerm('Seu nível de permissão atual é somente leitura/comentário e não cria tarefas.')
+        }
         const creator = actorName || user.email || 'Usuário'
         let initialAssignees: string[] = []
-        if (Array.isArray(payload.assignees) && payload.assignees.length > 0) {
+        if (Array.isArray(payload.assignees)) {
           initialAssignees = (payload.assignees as unknown[]).map((a) => String(a).trim()).filter(Boolean)
         } else if (payload.assignee_name) {
           initialAssignees = String(payload.assignee_name).split(',').map((s) => s.trim()).filter(Boolean)
         }
 
-        // Garante que o criador sempre seja automaticamente incluído como responsável
-        if (!initialAssignees.some((a) => a.toLowerCase() === creator.toLowerCase() || (user.email && a.toLowerCase() === user.email.toLowerCase()))) {
-          initialAssignees = [creator, ...initialAssignees]
+        // Em tarefas novas sem responsáveis informados, atribui automaticamente ao criador
+        if (initialAssignees.length === 0 && !payload.allow_empty_assignees) {
+          initialAssignees = [creator]
         }
 
         const finalAssigneeName = initialAssignees.join(', ')
@@ -917,7 +999,7 @@ export async function POST(request: NextRequest) {
             client_id: payload.client_id || null,
             client_name_snapshot: payload.client_name_snapshot || '',
             status_id: payload.status_id || null,
-            status_key: payload.status_key || 'todo',
+            status_key: payload.status_key || 'A Fazer',
             title: payload.title,
             description: payload.description || '',
             priority: payload.priority || 'medium',
@@ -930,13 +1012,16 @@ export async function POST(request: NextRequest) {
             is_tracking_time: Boolean(payload.is_tracking_time),
             tags: Array.isArray(payload.tags) ? payload.tags : [],
             custom_fields: Array.isArray(payload.custom_fields) ? payload.custom_fields : [],
-            subtasks: payload.subtasks || [],
-            comments: payload.comments || [],
-            attachments: payload.attachments || [],
-            links: payload.links || [],
-            linked_task_ids: payload.linked_task_ids || [],
+            subtasks: [],
+            comments: Array.isArray(payload.comments) ? payload.comments : [],
+            attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+            links: Array.isArray(payload.links) ? payload.links : [],
+            linked_task_ids: Array.isArray(payload.linked_task_ids) ? payload.linked_task_ids : [],
             parent_task_id: payload.parent_task_id || null,
             origin_reference: payload.origin_reference || '',
+            created_by_user_id: user.id,
+            created_by_name: creator,
+            is_archived: false,
           })
           .select('*')
           .single()
@@ -947,9 +1032,97 @@ export async function POST(request: NextRequest) {
 
       case 'UPDATE_TASK': {
         const { taskId, updates } = payload
+        const allowedKeys = new Set([
+          'title',
+          'description',
+          'priority',
+          'status_key',
+          'status_id',
+          'list_id',
+          'client_id',
+          'client_name_snapshot',
+          'assignee_name',
+          'assignees',
+          'start_date',
+          'due_date',
+          'time_estimate',
+          'time_spent_seconds',
+          'is_tracking_time',
+          'tags',
+          'custom_fields',
+          'subtasks',
+          'comments',
+          'attachments',
+          'links',
+          'linked_task_ids',
+          'parent_task_id',
+          'origin_reference',
+          'is_archived',
+        ])
+        const cleanUpdates: Record<string, unknown> = {}
+        if (updates && typeof updates === 'object') {
+          for (const [k, v] of Object.entries(updates as Record<string, unknown>)) {
+            if (allowedKeys.has(k) && v !== undefined) {
+              cleanUpdates[k] = v
+            }
+          }
+        }
+        if (cleanUpdates.is_archived !== undefined) {
+          const { data: targetTask } = await admin
+            .from('tasks')
+            .select('created_by_user_id, created_by_name')
+            .eq('id', taskId)
+            .maybeSingle()
+          if (!canUserArchiveTask(actorCtx, targetTask)) {
+            return denyPerm(
+              'Apenas quem criou a tarefa, um Convidado Gerente ou Membro pode arquivar/restaurar esta tarefa.'
+            )
+          }
+          const archiveFlag = Boolean(cleanUpdates.is_archived)
+          cleanUpdates.is_archived = archiveFlag
+          cleanUpdates.archived_at = archiveFlag ? new Date().toISOString() : null
+          cleanUpdates.archived_by_user_id = archiveFlag ? user.id : null
+        }
+        if (Array.isArray(cleanUpdates.assignees) && cleanUpdates.assignee_name === undefined) {
+          cleanUpdates.assignee_name = (cleanUpdates.assignees as string[]).join(', ')
+        }
+
         const { data, error } = await admin
           .from('tasks')
-          .update(updates)
+          .update(cleanUpdates)
+          .eq('id', taskId)
+          .select('*')
+          .single()
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        return NextResponse.json({ ok: true, data })
+      }
+
+      case 'ARCHIVE_TASK': {
+        const taskId = String(payload.taskId || '')
+        const archived = Boolean(payload.archived)
+        const { data: targetTask } = await admin
+          .from('tasks')
+          .select('id, created_by_user_id, created_by_name')
+          .eq('id', taskId)
+          .maybeSingle()
+
+        if (!targetTask) {
+          return NextResponse.json({ error: 'Tarefa não encontrada.' }, { status: 404 })
+        }
+        if (!canUserArchiveTask(actorCtx, targetTask)) {
+          return denyPerm(
+            'Apenas quem criou a tarefa, um Convidado Gerente ou Membro pode arquivar esta tarefa.'
+          )
+        }
+
+        const { data, error } = await admin
+          .from('tasks')
+          .update({
+            is_archived: archived,
+            archived_at: archived ? new Date().toISOString() : null,
+            archived_by_user_id: archived ? user.id : null,
+          })
           .eq('id', taskId)
           .select('*')
           .single()
@@ -983,20 +1156,48 @@ export async function POST(request: NextRequest) {
       }
 
       case 'DELETE_TASK': {
-        await admin.from('tasks').delete().eq('id', payload.taskId)
+        const { data: targetTask } = await admin
+          .from('tasks')
+          .select('id, created_by_user_id, created_by_name')
+          .eq('id', payload.taskId)
+          .maybeSingle()
+
+        if (!canUserDeleteTask(actorCtx, targetTask)) {
+          return denyPerm(
+            'Apenas quem criou a tarefa, um Convidado Gerente ou Membro autorizado pode excluir esta tarefa.'
+          )
+        }
+
+        const { error } = await admin.from('tasks').delete().eq('id', payload.taskId)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
         return NextResponse.json({ ok: true })
       }
 
       case 'CREATE_CUSTOM_FIELD_DEF': {
+        if (!hasFeaturePermission(actorCtx, 'custom_fields.manage')) {
+          return denyPerm('Seu nível de acesso não permite criar campos personalizados.')
+        }
+        const scope = payload.scope || 'list'
+        const targetTaskIds = Array.isArray(payload.target_task_ids)
+          ? (payload.target_task_ids as unknown[]).map((id) => String(id)).filter(Boolean)
+          : []
+        const rawGroupId = payload.group_id ? String(payload.group_id) : ''
+        const safeGroupId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(rawGroupId) ? rawGroupId : null
         const { data, error } = await admin
           .from('custom_field_definitions')
           .insert({
             organization_id: orgId,
-            list_id: payload.list_id || null,
-            name: payload.name,
+            list_id: scope === 'list' ? (payload.list_id || null) : null,
+            target_task_ids: scope === 'task' ? targetTaskIds : [],
+            name: String(payload.name || '').trim(),
             type: payload.type || 'text',
-            options: payload.options || [],
-            scope: payload.scope || 'list',
+            options: Array.isArray(payload.options) ? payload.options : [],
+            scope,
+            description: String(payload.description || ''),
+            default_value: String(payload.default_value || ''),
+            group_id: safeGroupId,
+            order_index: Number(payload.order_index || 0),
+            cover_image: String(payload.cover_image || ''),
             is_required: Boolean(payload.is_required),
           })
           .select('*')
@@ -1007,10 +1208,44 @@ export async function POST(request: NextRequest) {
       }
 
       case 'UPDATE_CUSTOM_FIELD_DEF': {
+        if (!hasFeaturePermission(actorCtx, 'custom_fields.manage')) {
+          return denyPerm('Seu nível de acesso não permite editar definições de campos.')
+        }
         const { defId, updates } = payload
+        const allowed = new Set([
+          'name',
+          'type',
+          'options',
+          'scope',
+          'list_id',
+          'target_task_ids',
+          'is_required',
+          'description',
+          'default_value',
+          'group_id',
+          'order_index',
+          'cover_image',
+        ])
+        const cleanUpdates: Record<string, unknown> = {}
+        if (updates && typeof updates === 'object') {
+          for (const [k, v] of Object.entries(updates as Record<string, unknown>)) {
+            if (allowed.has(k) && v !== undefined) {
+              cleanUpdates[k] = v
+            }
+          }
+        }
+        if (cleanUpdates.scope === 'template') {
+          cleanUpdates.list_id = null
+          cleanUpdates.target_task_ids = []
+        } else if (cleanUpdates.scope === 'list') {
+          cleanUpdates.target_task_ids = []
+        } else if (cleanUpdates.scope === 'task') {
+          cleanUpdates.list_id = null
+        }
+
         const { data, error } = await admin
           .from('custom_field_definitions')
-          .update(updates)
+          .update(cleanUpdates)
           .eq('id', defId)
           .select('*')
           .single()
@@ -1019,9 +1254,145 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, data })
       }
 
-      case 'DELETE_CUSTOM_FIELD_DEF': {
-        await admin.from('custom_field_definitions').delete().eq('id', payload.defId)
+      case 'CREATE_CUSTOM_FIELD_GROUP': {
+        if (!hasFeaturePermission(actorCtx, 'custom_fields.manage')) {
+          return denyPerm('Seu nível de acesso não permite criar grupos modelos.')
+        }
+        const { data, error } = await admin
+          .from('custom_field_groups')
+          .insert({
+            organization_id: orgId,
+            name: String(payload.name || '').trim(),
+            description: String(payload.description || ''),
+            cover_image: String(payload.cover_image || '/images/custom-field-banner.jpg'),
+            fields: Array.isArray(payload.fields) ? payload.fields : [],
+            is_system_template: false,
+          })
+          .select('*')
+          .single()
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        return NextResponse.json({ ok: true, data })
+      }
+
+      case 'UPDATE_CUSTOM_FIELD_GROUP': {
+        const { groupId, updates } = payload
+        const cleanUpdates: Record<string, unknown> = {}
+        if (updates?.name !== undefined) cleanUpdates.name = String(updates.name).trim()
+        if (updates?.description !== undefined) cleanUpdates.description = String(updates.description)
+        if (updates?.cover_image !== undefined) cleanUpdates.cover_image = String(updates.cover_image)
+        if (Array.isArray(updates?.fields)) cleanUpdates.fields = updates.fields
+
+        const { data, error } = await admin
+          .from('custom_field_groups')
+          .update(cleanUpdates)
+          .eq('id', groupId)
+          .select('*')
+          .single()
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        return NextResponse.json({ ok: true, data })
+      }
+
+      case 'DELETE_CUSTOM_FIELD_GROUP': {
+        const { error } = await admin
+          .from('custom_field_groups')
+          .delete()
+          .eq('id', payload.groupId)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
         return NextResponse.json({ ok: true })
+      }
+
+      case 'APPLY_CUSTOM_FIELD_GROUP': {
+        if (!hasFeaturePermission(actorCtx, 'custom_fields.manage')) {
+          return denyPerm('Seu nível de acesso não permite aplicar grupos modelos.')
+        }
+        const scope = payload.scope || 'list'
+        const listId = scope === 'list' ? (payload.list_id || null) : null
+        const targetTaskIds =
+          scope === 'task' && Array.isArray(payload.target_task_ids)
+            ? (payload.target_task_ids as unknown[]).map((id) => String(id)).filter(Boolean)
+            : []
+        const rawGroupId = payload.groupId ? String(payload.groupId) : ''
+        const safeGroupId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(rawGroupId) ? rawGroupId : null
+        const groupFields = Array.isArray(payload.fields) ? payload.fields : []
+        const createdDefs: unknown[] = []
+
+        for (let idx = 0; idx < groupFields.length; idx++) {
+          const gf = groupFields[idx] as Record<string, unknown>
+          const fieldName = String(gf.name || '').trim()
+          if (!fieldName) continue
+
+          const { data: created, error } = await admin
+            .from('custom_field_definitions')
+            .insert({
+              organization_id: orgId,
+              list_id: listId,
+              target_task_ids: targetTaskIds,
+              name: fieldName,
+              type: String(gf.type || 'text'),
+              options: Array.isArray(gf.options) ? gf.options : [],
+              scope,
+              description: String(gf.description || ''),
+              default_value: String(gf.default_value || ''),
+              group_id: safeGroupId,
+              order_index: idx,
+              cover_image: String(payload.cover_image || ''),
+              is_required: Boolean(gf.is_required),
+            })
+            .select('*')
+            .single()
+
+          if (!error && created) {
+            createdDefs.push(created)
+          }
+        }
+
+        return NextResponse.json({ ok: true, data: createdDefs })
+      }
+
+      case 'DELETE_CUSTOM_FIELD_DEF': {
+        if (!hasFeaturePermission(actorCtx, 'custom_fields.manage')) {
+          return denyPerm('Seu nível de acesso não permite excluir campos personalizados.')
+        }
+        const defId = payload.defId ? String(payload.defId) : ''
+        let targetName = payload.fieldName ? String(payload.fieldName) : ''
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(defId)
+
+        if (isUuid) {
+          const { data: defRow } = await admin
+            .from('custom_field_definitions')
+            .select('name')
+            .eq('id', defId)
+            .maybeSingle()
+          if (defRow?.name && !targetName) targetName = String(defRow.name)
+          await admin.from('custom_field_definitions').delete().eq('id', defId)
+        }
+
+        // Remove valores desse campo das tarefas para evitar reaparecimento como campo órfão
+        if (defId || targetName) {
+          const { data: orgTasks } = await admin
+            .from('tasks')
+            .select('id, custom_fields')
+            .eq('organization_id', orgId)
+
+          for (const t of orgTasks || []) {
+            if (!Array.isArray(t.custom_fields) || t.custom_fields.length === 0) continue
+            const filtered = t.custom_fields.filter((cf: Record<string, unknown>) => {
+              const matchId = defId && cf.field_id === defId
+              const matchName =
+                targetName &&
+                typeof cf.field_name === 'string' &&
+                cf.field_name.toLowerCase() === targetName.toLowerCase()
+              return !matchId && !matchName
+            })
+            if (filtered.length !== t.custom_fields.length) {
+              await admin.from('tasks').update({ custom_fields: filtered }).eq('id', t.id)
+            }
+          }
+        }
+
+        return NextResponse.json({ ok: true, deletedId: defId })
       }
 
       // =====================================================================
@@ -1186,14 +1557,23 @@ export async function POST(request: NextRequest) {
       }
 
       case 'INVITE_TEAM_MEMBER': {
+        if (!hasFeaturePermission(actorCtx, 'team.manage_members')) {
+          return denyPerm('Apenas administradores ou perfis autorizados podem conceder acessos.')
+        }
         const cleanEmail = String(payload.email || '').trim().toLowerCase()
+        const rawPassword = typeof payload.password === 'string' ? payload.password : ''
         if (!cleanEmail) {
           return NextResponse.json({ error: 'E-mail do colaborador é obrigatório' }, { status: 400 })
         }
+        if (rawPassword && rawPassword.length < 6) {
+          return NextResponse.json({ error: 'A senha precisa ter pelo menos 6 caracteres' }, { status: 400 })
+        }
 
         let targetUserId: string | null = null
-        let targetUserName = cleanEmail.split('@')[0]
+        let targetUserName = String(payload.full_name || '').trim() || cleanEmail.split('@')[0]
         let targetUserPhone = ''
+        let passwordCreatedOrUpdated = false
+
         try {
           const { data: userList } = await admin.auth.admin.listUsers()
           const matchedUser = userList?.users?.find(
@@ -1202,6 +1582,7 @@ export async function POST(request: NextRequest) {
           if (matchedUser) {
             targetUserId = matchedUser.id
             targetUserName =
+              String(payload.full_name || '').trim() ||
               (matchedUser.user_metadata?.full_name as string) ||
               (matchedUser.user_metadata?.name as string) ||
               targetUserName
@@ -1211,16 +1592,52 @@ export async function POST(request: NextRequest) {
               (matchedUser.user_metadata?.phone as string) ||
               matchedUser.phone ||
               ''
+
+            if (rawPassword && rawPassword.length >= 6) {
+              const { error: updErr } = await admin.auth.admin.updateUserById(matchedUser.id, {
+                password: rawPassword,
+                email_confirm: true,
+                ...(payload.full_name ? { user_metadata: { ...matchedUser.user_metadata, full_name: payload.full_name } } : {}),
+              })
+              if (!updErr) passwordCreatedOrUpdated = true
+            }
+          } else if (rawPassword && rawPassword.length >= 6) {
+            // Cria a conta imediatamente no Supabase Auth com e-mail e senha definidos
+            const { data: createdAuth, error: createAuthErr } = await admin.auth.admin.createUser({
+              email: cleanEmail,
+              password: rawPassword,
+              email_confirm: true,
+              user_metadata: {
+                full_name: targetUserName,
+                organization_id: orgId,
+              },
+            })
+            if (createAuthErr) {
+              return NextResponse.json(
+                { error: `Erro ao criar login do colaborador: ${createAuthErr.message}` },
+                { status: 400 }
+              )
+            }
+            if (createdAuth?.user) {
+              targetUserId = createdAuth.user.id
+              passwordCreatedOrUpdated = true
+            }
           }
         } catch (e) {
-          console.warn('Aviso ao consultar usuários no auth:', e)
+          console.warn('Aviso ao consultar/criar usuário no auth:', e)
         }
 
         const token = crypto.randomUUID()
-        const accessType = payload.access_type === 'MEMBER' ? 'MEMBER' : 'GUEST'
+        const validAccessLevels = new Set(['ADMIN', 'MEMBER', 'GUEST_MANAGER', 'GUEST_COLLABORATOR', 'GUEST'])
+        const rawAccess = String(payload.access_type || 'GUEST').trim().toUpperCase()
+        const accessType = validAccessLevels.has(rawAccess) ? rawAccess : 'GUEST'
         const allowedScreens = Array.isArray(payload.allowed_screens) ? payload.allowed_screens : []
         const allowedFolderIds = Array.isArray(payload.allowed_folder_ids) ? payload.allowed_folder_ids : []
         const allowedListIds = Array.isArray(payload.allowed_list_ids) ? payload.allowed_list_ids : []
+        const customPermissions =
+          payload.custom_permissions && typeof payload.custom_permissions === 'object'
+            ? payload.custom_permissions
+            : {}
 
         const memberPayload: Record<string, unknown> = {
           organization_id: orgId,
@@ -1243,6 +1660,7 @@ export async function POST(request: NextRequest) {
           allowed_screens: allowedScreens,
           allowed_folder_ids: allowedFolderIds,
           allowed_list_ids: allowedListIds,
+          custom_permissions: customPermissions,
           invitation_token: token,
         }
 
@@ -1387,6 +1805,7 @@ export async function POST(request: NextRequest) {
           ok: true,
           data: memberData,
           emailSent,
+          passwordSet: passwordCreatedOrUpdated,
           alreadyRegistered: Boolean(targetUserId),
           inviteLink: actionLink || directLoginUrl,
           directLoginUrl,
@@ -1394,7 +1813,121 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      case 'ADMIN_UPDATE_MEMBER_CREDENTIALS': {
+        if (!hasFeaturePermission(actorCtx, 'team.manage_members')) {
+          return denyPerm('Apenas administradores autorizados podem alterar e-mail ou senha de membros.')
+        }
+        const memberId = String(payload.memberId || '').trim()
+        const newEmail = typeof payload.newEmail === 'string' ? payload.newEmail.trim().toLowerCase() : ''
+        const newPassword = typeof payload.newPassword === 'string' ? payload.newPassword : ''
+
+        if (!memberId) {
+          return NextResponse.json({ error: 'ID do membro é obrigatório.' }, { status: 400 })
+        }
+        if (!newEmail && !newPassword) {
+          return NextResponse.json({ error: 'Informe um novo e-mail ou uma nova senha.' }, { status: 400 })
+        }
+        if (newPassword && newPassword.length < 6) {
+          return NextResponse.json({ error: 'A nova senha precisa ter pelo menos 6 caracteres.' }, { status: 400 })
+        }
+
+        const { data: targetMember, error: fetchErr } = await admin
+          .from('organization_members')
+          .select('*')
+          .eq('id', memberId)
+          .single()
+
+        if (fetchErr || !targetMember) {
+          return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 })
+        }
+
+        let authUserId: string | null = targetMember.user_id || null
+        if (!authUserId && targetMember.email) {
+          const { data: userList } = await admin.auth.admin.listUsers()
+          const matched = userList?.users?.find(
+            (u) => u.email?.toLowerCase() === String(targetMember.email).toLowerCase()
+          )
+          if (matched) authUserId = matched.id
+        }
+
+        const finalEmail = newEmail || String(targetMember.email || '').trim().toLowerCase()
+
+        if (authUserId) {
+          const authUpdates: { email?: string; password?: string; email_confirm?: boolean } = {}
+          if (newEmail && newEmail !== String(targetMember.email || '').toLowerCase()) {
+            authUpdates.email = newEmail
+            authUpdates.email_confirm = true
+          }
+          if (newPassword) {
+            authUpdates.password = newPassword
+          }
+
+          if (Object.keys(authUpdates).length > 0) {
+            const { error: authUpdErr } = await admin.auth.admin.updateUserById(authUserId, authUpdates)
+            if (authUpdErr) {
+              return NextResponse.json(
+                { error: `Falha ao atualizar credenciais no Auth: ${authUpdErr.message}` },
+                { status: 400 }
+              )
+            }
+          }
+        } else if (newPassword && finalEmail) {
+          // Cria o usuário no Auth se ainda não existia
+          const { data: createdAuth, error: createAuthErr } = await admin.auth.admin.createUser({
+            email: finalEmail,
+            password: newPassword,
+            email_confirm: true,
+            user_metadata: {
+              full_name: targetMember.full_name || finalEmail.split('@')[0],
+              organization_id: targetMember.organization_id,
+            },
+          })
+          if (createAuthErr) {
+            return NextResponse.json(
+              { error: `Erro ao criar conta no Auth: ${createAuthErr.message}` },
+              { status: 400 }
+            )
+          }
+          authUserId = createdAuth?.user?.id || null
+        } else {
+          return NextResponse.json(
+            { error: 'Este colaborador ainda não possui conta ativa. Defina uma senha para ativar.' },
+            { status: 400 }
+          )
+        }
+
+        const memberDbUpdates: Record<string, unknown> = {}
+        if (finalEmail && finalEmail !== targetMember.email) {
+          memberDbUpdates.email = finalEmail
+        }
+        if (authUserId && !targetMember.user_id) {
+          memberDbUpdates.user_id = authUserId
+          memberDbUpdates.member_status = 'ACTIVE'
+        }
+
+        let updatedMember = targetMember
+        if (Object.keys(memberDbUpdates).length > 0) {
+          const { data: updData } = await admin
+            .from('organization_members')
+            .update(memberDbUpdates)
+            .eq('id', memberId)
+            .select('*')
+            .single()
+          if (updData) updatedMember = updData
+        }
+
+        return NextResponse.json({
+          ok: true,
+          data: updatedMember,
+          email: finalEmail,
+          passwordUpdated: Boolean(newPassword),
+        })
+      }
+
       case 'UPDATE_TEAM_MEMBER': {
+        if (!hasFeaturePermission(actorCtx, 'team.manage_members')) {
+          return denyPerm('Seu nível de acesso não permite alterar permissões ou dados de colaboradores.')
+        }
         const memberId = payload.memberId as string
         const updates = payload.updates as Record<string, unknown>
         if (!memberId || !updates) {
@@ -1413,6 +1946,9 @@ export async function POST(request: NextRequest) {
       }
 
       case 'DELETE_TEAM_MEMBER': {
+        if (!hasFeaturePermission(actorCtx, 'team.manage_members')) {
+          return denyPerm('Seu nível de acesso não permite remover membros da organização.')
+        }
         const memberId = payload.memberId as string
         if (!memberId) {
           return NextResponse.json({ error: 'ID do colaborador não informado' }, { status: 400 })
@@ -1932,7 +2468,7 @@ export async function POST(request: NextRequest) {
           .insert({
             organization_id: orgId,
             name: name || 'Novo Funil',
-            color: color || '#F0521F',
+            color: color || '#0066FF',
             is_default: Boolean(is_default),
           })
           .select('*')

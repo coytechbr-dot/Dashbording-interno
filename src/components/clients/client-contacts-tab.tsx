@@ -151,7 +151,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
       <div className="flex flex-wrap items-center justify-between gap-[12px] border-b border-[var(--line)] pb-[14px]">
         <div>
           <div className="flex items-center gap-[8px]">
-            <Users className="w-4 h-4 text-[#F0521F]" />
+            <Users className="w-4 h-4 text-[#0066FF]" />
             <h2 className="text-[16px] font-bold text-[var(--fg)]">
               Contatos & Pessoas Chave · {clientName}
             </h2>
@@ -167,7 +167,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="h-[36px] px-[14px] rounded-full bg-[#141414] text-[#F4F4F2] text-[12px] font-semibold hover:bg-[#F0521F] flex items-center gap-[6px] transition-colors cursor-pointer"
+          className="h-[36px] px-[14px] rounded-full bg-[#141414] text-[#F4F4F2] text-[12px] font-semibold hover:bg-[#0066FF] flex items-center gap-[6px] transition-colors cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Novo Contato</span>
@@ -191,9 +191,9 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="h-[34px] px-[14px] rounded-full bg-[var(--surface)] border border-[var(--line2)] hover:border-[#F0521F] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
+            className="h-[34px] px-[14px] rounded-full bg-[var(--surface)] border border-[var(--line2)] hover:border-[#0066FF] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-[#F0521F]" />
+            <Plus className="w-3.5 h-3.5 text-[#0066FF]" />
             <span>Adicionar Primeiro Contato</span>
           </button>
         </div>
@@ -254,8 +254,8 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
 
                   {/* Badge de Decisor */}
                   {contact.is_primary_decision_maker && (
-                    <div className="inline-flex items-center gap-[5px] px-[8px] py-[3px] rounded-full bg-[#f0521f]/10 border border-[#f0521f]/30 text-[#f0521f] text-[11px] font-semibold w-fit">
-                      <Star className="w-3 h-3 fill-[#f0521f]" />
+                    <div className="inline-flex items-center gap-[5px] px-[8px] py-[3px] rounded-full bg-[#0066FF]/10 border border-[#0066FF]/30 text-[#0066FF] text-[11px] font-semibold w-fit">
+                      <Star className="w-3 h-3 fill-[#0066FF]" />
                       <span>Tomador de Decisão</span>
                     </div>
                   )}
@@ -355,7 +355,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Carlos Eduardo de Oliveira"
-                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#F0521F]"
+                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
                 />
               </div>
 
@@ -368,7 +368,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                   value={roleTitle}
                   onChange={(e) => setRoleTitle(e.target.value)}
                   placeholder="Ex: Diretor Financeiro / Co-Fundador"
-                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#F0521F]"
+                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
                 />
               </div>
 
@@ -382,7 +382,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="11999998888"
-                    className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#F0521F]"
+                    className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
                   />
                 </div>
 
@@ -395,7 +395,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="carlos@empresa.com"
-                    className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#F0521F]"
+                    className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
                   />
                 </div>
               </div>
@@ -405,7 +405,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                   type="checkbox"
                   checked={isDecisionMaker}
                   onChange={(e) => setIsDecisionMaker(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#F0521F] focus:ring-0 cursor-pointer"
+                  className="w-4 h-4 rounded text-[#0066FF] focus:ring-0 cursor-pointer"
                 />
                 <div>
                   <span className="text-[12.5px] font-semibold text-[var(--fg)] block">
@@ -426,7 +426,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ex: Prefere alinhamentos matutinos pelo WhatsApp; participa do QBR trimestral."
-                  className="w-full p-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#F0521F] resize-none text-[12px]"
+                  className="w-full p-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF] resize-none text-[12px]"
                 />
               </div>
 
@@ -441,7 +441,7 @@ export function ClientContactsTab({ clientId, clientName }: ClientContactsTabPro
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="h-[36px] px-[18px] rounded-full bg-[#141414] hover:bg-[#F0521F] text-[#F4F4F2] font-semibold text-[12px] transition-colors cursor-pointer disabled:opacity-50"
+                  className="h-[36px] px-[18px] rounded-full bg-[#141414] hover:bg-[#0066FF] text-[#F4F4F2] font-semibold text-[12px] transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? 'Salvando...' : editingContact ? 'Atualizar Contato' : 'Adicionar Contato'}
                 </button>

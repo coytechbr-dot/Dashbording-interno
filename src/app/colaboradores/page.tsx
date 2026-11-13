@@ -35,9 +35,21 @@ import {
   Copy,
   Key,
   Bot,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from 'lucide-react'
 import { McpTokensTab } from '@/components/colaboradores/mcp-tokens-tab'
+import { CoyDatePicker } from '@/components/ui/coy-date-picker'
 import { useCoyDash } from '@/lib/coydash-store'
+import {
+  ACCESS_LEVELS_META,
+  FEATURE_PERMISSION_CATALOG,
+  generateStrongPassword,
+  getAccessLevelMeta,
+  isGuestScopedLevel,
+  normalizeAccessType,
+} from '@/lib/access-control'
 import {
   AccessType,
   ContractType,
@@ -195,6 +207,7 @@ export default function ColaboradoresRHPage() {
     taskLists,
     inviteTeamMember,
     updateTeamMember,
+    adminUpdateMemberCredentials,
     deleteTeamMember,
     createHrNote,
     deleteHrNote,
@@ -212,8 +225,12 @@ export default function ColaboradoresRHPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteStep, setInviteStep] = useState<1 | 2 | 3 | 4>(1)
   const [isSendingInvite, setIsSendingInvite] = useState(false)
+  const [showInvitePassword, setShowInvitePassword] = useState(false)
+  const [inviteError, setInviteError] = useState('')
   const [inviteResult, setInviteResult] = useState<{
     email: string
+    password?: string
+    passwordSet?: boolean
     inviteLink: string
     alreadyRegistered?: boolean
     emailSent?: boolean
@@ -223,15 +240,25 @@ export default function ColaboradoresRHPage() {
   const [activeDetailMember, setActiveDetailMember] = useState<TeamMemberItem | null>(null)
   const [activeModalTab, setActiveModalTab] = useState<'pessoal' | 'contrato' | 'acessos' | 'historico'>('pessoal')
 
-  // Estado do formulário de convite (Sem nome e sem número, pois virão do login do usuário)
+  // Estado de alteração de credenciais pelo Admin (E-mail e Senha)
+  const [credEmail, setCredEmail] = useState('')
+  const [credPassword, setCredPassword] = useState('')
+  const [showCredPassword, setShowCredPassword] = useState(false)
+  const [isSavingCreds, setIsSavingCreds] = useState(false)
+  const [credFeedback, setCredFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Estado do formulário de criação de acesso (E-mail, Nome e Senha Inicial)
   const [inviteForm, setInviteForm] = useState({
+    full_name: '',
     email: '',
+    password: '',
     access_type: 'GUEST' as AccessType,
     sector: 'Tecnologia & Sistemas',
     job_title: 'Dev de Sistemas',
     allowed_screens: getScreensForSectorAndRole('Tecnologia & Sistemas', 'Dev de Sistemas'),
     allowed_folder_ids: [] as string[],
     allowed_list_ids: [] as string[],
+    custom_permissions: {} as Record<string, boolean>,
   })
 
   // Estado de nova anotação do RH
@@ -269,15 +296,20 @@ export default function ColaboradoresRHPage() {
   const handleOpenInviteModal = () => {
     setInviteStep(1)
     setInviteResult(null)
+    setInviteError('')
     setCopiedLink(false)
+    setShowInvitePassword(true)
     setInviteForm({
+      full_name: '',
       email: '',
+      password: generateStrongPassword(10),
       access_type: 'GUEST',
       sector: 'Tecnologia & Sistemas',
       job_title: 'Dev de Sistemas',
       allowed_screens: getScreensForSectorAndRole('Tecnologia & Sistemas', 'Dev de Sistemas'),
       allowed_folder_ids: [],
       allowed_list_ids: [],
+      custom_permissions: {},
     })
     setShowInviteModal(true)
   }
@@ -286,36 +318,102 @@ export default function ColaboradoresRHPage() {
   const handleOpenMemberDetail = (member: TeamMemberItem) => {
     setActiveDetailMember(member)
     setEditFormData({ ...member })
+    setCredEmail(member.email || '')
+    setCredPassword('')
+    setCredFeedback(null)
     setActiveModalTab('pessoal')
   }
 
-  // Enviar novo convite (Regra 2: sem nome nem telefone no payload inicial, pois virão do login)
+  // Atualizar E-mail e/ou Senha do Colaborador (Admin)
+  const handleAdminUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeDetailMember || isSavingCreds) return
+    setCredFeedback(null)
+
+    const cleanNewEmail = credEmail.trim().toLowerCase()
+    const cleanNewPwd = credPassword.trim()
+
+    if (cleanNewPwd && cleanNewPwd.length < 6) {
+      setCredFeedback({ type: 'error', text: 'A nova senha deve ter pelo menos 6 caracteres.' })
+      return
+    }
+
+    setIsSavingCreds(true)
+    try {
+      const res = await adminUpdateMemberCredentials(
+        activeDetailMember.id,
+        cleanNewEmail !== activeDetailMember.email.toLowerCase() ? cleanNewEmail : undefined,
+        cleanNewPwd || undefined
+      )
+      if (!res.ok) {
+        setCredFeedback({ type: 'error', text: res.error || 'Erro ao atualizar credenciais.' })
+      } else {
+        setActiveDetailMember((prev) =>
+          prev
+            ? {
+                ...prev,
+                email: res.email || cleanNewEmail || prev.email,
+                member_status: 'ACTIVE',
+              }
+            : null
+        )
+        setCredPassword('')
+        setCredFeedback({
+          type: 'success',
+          text: res.passwordUpdated
+            ? 'E-mail e nova senha atualizados com sucesso!'
+            : 'E-mail de acesso atualizado com sucesso!',
+        })
+      }
+    } finally {
+      setIsSavingCreds(false)
+    }
+  }
+
+  // Enviar novo convite / criar acesso direto com e-mail e senha
   const handleSendInvite = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!inviteForm.email.trim() || isSendingInvite) return
 
+    if (inviteForm.password.trim() && inviteForm.password.trim().length < 6) {
+      setInviteError('A senha precisa ter pelo menos 6 caracteres.')
+      setInviteStep(1)
+      return
+    }
+
+    setInviteError('')
     setIsSendingInvite(true)
     try {
       const res = await inviteTeamMember({
         email: inviteForm.email.trim(),
-        full_name: '', // Será preenchido automaticamente pelo login do usuário
-        whatsapp_phone: '', // Será preenchido automaticamente pelo login do usuário
+        password: inviteForm.password.trim() || undefined,
+        full_name: inviteForm.full_name.trim(),
+        whatsapp_phone: '',
         whatsapp: '',
         role: 'CLIENT_OPERATIONS',
         access_type: inviteForm.access_type,
         sector: inviteForm.sector,
         job_title: inviteForm.job_title,
-        allowed_screens: inviteForm.access_type === 'MEMBER' ? [] : inviteForm.allowed_screens,
-        allowed_folder_ids: inviteForm.access_type === 'MEMBER' ? [] : inviteForm.allowed_folder_ids,
-        allowed_list_ids: inviteForm.access_type === 'MEMBER' ? [] : inviteForm.allowed_list_ids,
-        member_status: 'INVITED',
+        allowed_screens: !isGuestScopedLevel(inviteForm.access_type) ? [] : inviteForm.allowed_screens,
+        allowed_folder_ids: !isGuestScopedLevel(inviteForm.access_type) ? [] : inviteForm.allowed_folder_ids,
+        allowed_list_ids: !isGuestScopedLevel(inviteForm.access_type) ? [] : inviteForm.allowed_list_ids,
+        custom_permissions: inviteForm.custom_permissions,
+        member_status: inviteForm.password.trim() ? 'ACTIVE' : 'INVITED',
       })
 
+      if (!res.ok) {
+        setInviteError(res.error || 'Não foi possível criar o acesso.')
+        setInviteStep(1)
+        return
+      }
+
       const origin = typeof window !== 'undefined' ? window.location.origin : ''
-      const directUrl = `${origin}/login?invited=true&email=${encodeURIComponent(inviteForm.email.trim())}`
+      const directUrl = `${origin}/login?email=${encodeURIComponent(inviteForm.email.trim())}`
 
       setInviteResult({
         email: inviteForm.email.trim(),
+        password: inviteForm.password.trim() || undefined,
+        passwordSet: res?.passwordSet,
         inviteLink: res?.inviteLink || res?.directLoginUrl || directUrl,
         alreadyRegistered: res?.alreadyRegistered,
         emailSent: res?.emailSent,
@@ -356,7 +454,13 @@ export default function ColaboradoresRHPage() {
         m.sector.toLowerCase().includes(search.toLowerCase())
 
       const matchSector = selectedSectorFilter === 'ALL' || m.sector === selectedSectorFilter
-      const matchAccess = selectedAccessFilter === 'ALL' || m.access_type === selectedAccessFilter
+      const normAccess = normalizeAccessType(m.access_type)
+      const matchAccess =
+        selectedAccessFilter === 'ALL'
+          ? true
+          : selectedAccessFilter === 'ALL_GUESTS'
+          ? isGuestScopedLevel(normAccess)
+          : normAccess === selectedAccessFilter
 
       return matchSearch && matchSector && matchAccess
     })
@@ -380,8 +484,8 @@ export default function ColaboradoresRHPage() {
 
   // Métricas de RH
   const totalColaboradores = orgMembers.length
-  const totalMembros = orgMembers.filter((m) => m.access_type === 'MEMBER').length
-  const totalConvidados = orgMembers.filter((m) => m.access_type === 'GUEST').length
+  const totalMembros = orgMembers.filter((m) => !isGuestScopedLevel(m.access_type)).length
+  const totalConvidados = orgMembers.filter((m) => isGuestScopedLevel(m.access_type)).length
   const aniversariantesDoMes = orgMembers.filter((m) => isBirthdayThisMonth(m.birth_date)).length
 
   return (
@@ -437,7 +541,7 @@ export default function ColaboradoresRHPage() {
           onClick={() => setActiveMainTab('MCP_TOKENS')}
           className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer ${
             activeMainTab === 'MCP_TOKENS'
-              ? 'bg-[#F0521F] text-white shadow-sm'
+              ? 'bg-[#0066FF] text-white shadow-sm'
               : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
           }`}
         >
@@ -445,7 +549,7 @@ export default function ColaboradoresRHPage() {
           <span>Tokens de IA & MCP</span>
           <span
             className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-[6px] ${
-              activeMainTab === 'MCP_TOKENS' ? 'bg-white/20 text-white' : 'bg-[#F0521F]/10 text-[#F0521F]'
+              activeMainTab === 'MCP_TOKENS' ? 'bg-white/20 text-white' : 'bg-[#0066FF]/10 text-[#0066FF]'
             }`}
           >
             Governança
@@ -529,8 +633,12 @@ export default function ColaboradoresRHPage() {
             className="bg-[var(--bg)] border border-[var(--line)] rounded-[10px] px-3 py-2 text-[12.5px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
           >
             <option value="ALL">Todos os Níveis</option>
-            <option value="MEMBER">Membro (Full)</option>
-            <option value="GUEST">Convidado (Restrito)</option>
+            <option value="ALL_GUESTS">Todos os Convidados</option>
+            {ACCESS_LEVELS_META.map((lvl) => (
+              <option key={lvl.value} value={lvl.value}>
+                {lvl.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -601,15 +709,28 @@ export default function ColaboradoresRHPage() {
                             <span className="font-semibold text-[14px] truncate group-hover:text-[#0066FF] transition-colors">
                               {member.full_name || member.email.split('@')[0]}
                             </span>
-                            {member.access_type === 'MEMBER' ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] bg-[#5cd3a8]/15 text-[#5cd3a8] border border-[#5cd3a8]/30">
-                                Membro
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] bg-[#e8c14a]/15 text-[#e8c14a] border border-[#e8c14a]/30">
-                                Convidado
-                              </span>
-                            )}
+                            {(() => {
+                              const levelMeta = getAccessLevelMeta(member.access_type)
+                              const customCount = Object.keys(member.custom_permissions || {}).length
+                              return (
+                                <span
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-[6px] border whitespace-nowrap"
+                                  style={{
+                                    backgroundColor: `${levelMeta.badgeColor}18`,
+                                    color: levelMeta.badgeColor,
+                                    borderColor: `${levelMeta.badgeColor}45`,
+                                  }}
+                                  title={
+                                    customCount > 0
+                                      ? `${levelMeta.description} (${customCount} ajuste(s) fino(s))`
+                                      : levelMeta.description
+                                  }
+                                >
+                                  {levelMeta.shortLabel}
+                                  {customCount > 0 ? ` +${customCount}` : ''}
+                                </span>
+                              )
+                            })()}
                           </div>
 
                           <div className="flex items-center gap-2 text-[12px] text-[var(--ds-muted)] truncate">
@@ -845,11 +966,11 @@ export default function ColaboradoresRHPage() {
                       <label className="block text-[11.5px] font-medium text-[var(--ds-muted)] uppercase mb-1">
                         Data de Nascimento
                       </label>
-                      <input
-                        type="date"
+                      <CoyDatePicker
                         value={editFormData.birth_date || ''}
-                        onChange={(e) => setEditFormData({ ...editFormData, birth_date: e.target.value })}
-                        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[10px] px-3 py-2 text-[13px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                        onChange={(val) => setEditFormData({ ...editFormData, birth_date: val })}
+                        placeholder="Selecionar data..."
+                        className="w-full"
                       />
                       {calculateAge(editFormData.birth_date) !== null && (
                         <span className="text-[11px] text-[var(--ds-muted)] mt-1 block">
@@ -920,11 +1041,11 @@ export default function ColaboradoresRHPage() {
                       <label className="block text-[11.5px] font-medium text-[var(--ds-muted)] uppercase mb-1">
                         Data de Admissão / Início
                       </label>
-                      <input
-                        type="date"
+                      <CoyDatePicker
                         value={editFormData.hiring_date || ''}
-                        onChange={(e) => setEditFormData({ ...editFormData, hiring_date: e.target.value })}
-                        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[10px] px-3 py-2 text-[13px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                        onChange={(val) => setEditFormData({ ...editFormData, hiring_date: val })}
+                        placeholder="Selecionar data de início..."
+                        className="w-full"
                       />
                     </div>
 
@@ -1007,6 +1128,94 @@ export default function ColaboradoresRHPage() {
               {/* ABA 3: ACESSOS & PERMISSÕES */}
               {activeModalTab === 'acessos' && (
                 <div className="flex flex-col gap-6">
+                  {/* CREDENCIAIS DE LOGIN: E-MAIL E TROCA DE SENHA PELO ADMIN */}
+                  <div className="p-4 rounded-[14px] bg-[var(--surface)] border border-[#0066FF]/40 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-bold text-[#0066FF] uppercase tracking-wider flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5" /> Credenciais de Acesso (E-mail &amp; Senha)
+                      </span>
+                      <span className="text-[11px] font-medium text-[var(--ds-muted)]">
+                        Alteração direta pelo administrador
+                      </span>
+                    </div>
+
+                    {credFeedback && (
+                      <div
+                        className={`p-2.5 rounded-[10px] text-[12px] font-medium border ${
+                          credFeedback.type === 'success'
+                            ? 'bg-[#2F9E5A]/10 border-[#2F9E5A]/40 text-[#2F9E5A]'
+                            : 'bg-[#ef4444]/10 border-[#ef4444]/40 text-[#ef4444]'
+                        }`}
+                      >
+                        {credFeedback.text}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAdminUpdateCredentials} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--ds-muted)] uppercase mb-1">
+                          E-mail de Login
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={credEmail}
+                          onChange={(e) => setCredEmail(e.target.value)}
+                          placeholder="colaborador@coytech.com.br"
+                          className="w-full h-[38px] px-3 rounded-[8px] bg-[var(--bg)] border border-[var(--line2)] text-[12.5px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-semibold text-[var(--ds-muted)] uppercase">
+                            Nova Senha (opcional)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCredPassword(generateStrongPassword(10))
+                              setShowCredPassword(true)
+                            }}
+                            className="text-[10.5px] font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                          >
+                            Gerar senha forte
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showCredPassword ? 'text' : 'password'}
+                            value={credPassword}
+                            onChange={(e) => setCredPassword(e.target.value)}
+                            placeholder="Mínimo 6 caracteres"
+                            className="w-full h-[38px] pl-3 pr-9 rounded-[8px] bg-[var(--bg)] border border-[var(--line2)] text-[12.5px] font-mono text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCredPassword((v) => !v)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+                          >
+                            {showCredPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 flex items-center justify-between gap-3 pt-1">
+                        <span className="text-[11px] text-[var(--ds-muted)]">
+                          O colaborador também poderá alterar sua própria senha em Configurações.
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={isSavingCreds}
+                          className="h-[36px] px-4 rounded-full bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] font-semibold text-[12px] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 transition-colors"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>{isSavingCreds ? 'Salvando...' : 'Atualizar E-mail / Senha'}</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
                   {/* LINK DE ACESSO DO COLABORADOR */}
                   <div className="p-4 rounded-[14px] bg-[#0066FF]/10 border border-[#0066FF]/30 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between">
@@ -1050,59 +1259,68 @@ export default function ColaboradoresRHPage() {
                     </div>
                   </div>
 
-                  {/* Seletor Tipo de Acesso */}
+                  {/* Seletor Tipo de Acesso (5 Níveis RBAC) */}
                   <div className="p-4 rounded-[14px] bg-[var(--bg)]/50 border border-[var(--line)] flex flex-col gap-3">
-                    <span className="text-[12px] font-bold text-[var(--fg)] uppercase tracking-wider">
-                      Tipo de Acesso ao Workspace
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label
-                        className={`flex items-start gap-3 p-3.5 rounded-[12px] border cursor-pointer transition-colors ${
-                          editFormData.access_type === 'MEMBER'
-                            ? 'bg-[#5cd3a8]/10 border-[#5cd3a8] text-[var(--fg)]'
-                            : 'bg-[var(--surface)] border-[var(--line)] text-[var(--ds-muted)]'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="access_type_edit"
-                          checked={editFormData.access_type === 'MEMBER'}
-                          onChange={() => setEditFormData({ ...editFormData, access_type: 'MEMBER' })}
-                          className="mt-1"
-                        />
-                        <div>
-                          <div className="font-semibold text-[13px] text-[var(--fg)] flex items-center gap-1.5">
-                            <Shield className="w-4 h-4 text-[#5cd3a8]" /> Membro (Full)
-                          </div>
-                          <div className="text-[11.5px] mt-0.5">
-                            Tem acesso total a todas as telas, clientes, projetos e tarefas do workspace.
-                          </div>
-                        </div>
-                      </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-bold text-[var(--fg)] uppercase tracking-wider">
+                        Nível de Acesso no Workspace
+                      </span>
+                      <span className="text-[11px] text-[var(--ds-muted)]">
+                        {isGuestScopedLevel(editFormData.access_type)
+                          ? 'Escopo restrito a telas e projetos autorizados'
+                          : 'Acesso global ao workspace Coytech'}
+                      </span>
+                    </div>
 
-                      <label
-                        className={`flex items-start gap-3 p-3.5 rounded-[12px] border cursor-pointer transition-colors ${
-                          editFormData.access_type === 'GUEST'
-                            ? 'bg-[#e8c14a]/10 border-[#e8c14a] text-[var(--fg)]'
-                            : 'bg-[var(--surface)] border-[var(--line)] text-[var(--ds-muted)]'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="access_type_edit"
-                          checked={editFormData.access_type === 'GUEST'}
-                          onChange={() => setEditFormData({ ...editFormData, access_type: 'GUEST' })}
-                          className="mt-1"
-                        />
-                        <div>
-                          <div className="font-semibold text-[13px] text-[var(--fg)] flex items-center gap-1.5">
-                            <Lock className="w-4 h-4 text-[#e8c14a]" /> Convidado (Cirúrgico)
-                          </div>
-                          <div className="text-[11.5px] mt-0.5">
-                            Acesso estritamente limitado às telas, projetos e listas selecionados abaixo.
-                          </div>
-                        </div>
-                      </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {ACCESS_LEVELS_META.map((lvl) => {
+                        const isSelected = normalizeAccessType(editFormData.access_type) === lvl.value
+                        return (
+                          <label
+                            key={lvl.value}
+                            className={`flex items-start gap-2.5 p-3 rounded-[12px] border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-[var(--surface)] shadow-sm text-[var(--fg)]'
+                                : 'bg-[var(--surface)]/60 border-[var(--line)] hover:border-[var(--line2)] text-[var(--ds-muted)]'
+                            }`}
+                            style={
+                              isSelected
+                                ? {
+                                    borderColor: lvl.badgeColor,
+                                    backgroundColor: `${lvl.badgeColor}12`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <input
+                              type="radio"
+                              name="access_type_edit"
+                              checked={isSelected}
+                              onChange={() => setEditFormData({ ...editFormData, access_type: lvl.value })}
+                              className="mt-1 accent-[#0066FF]"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-[12.5px] text-[var(--fg)]">
+                                  {lvl.label}
+                                </span>
+                              </div>
+                              <span
+                                className="inline-block mt-0.5 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                style={{
+                                  backgroundColor: `${lvl.badgeColor}20`,
+                                  color: lvl.badgeColor,
+                                }}
+                              >
+                                {lvl.group === 'CONVIDADO' ? 'Escopo Restrito' : 'Equipe Interna'}
+                              </span>
+                              <div className="text-[11px] mt-1 text-[var(--ds-muted)] leading-snug">
+                                {lvl.description}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -1146,8 +1364,8 @@ export default function ColaboradoresRHPage() {
                     </div>
                   </div>
 
-                  {/* Telas Liberadas (se for Convidado) */}
-                  {editFormData.access_type === 'GUEST' && (
+                  {/* Telas Liberadas (para todos os níveis de Convidado) */}
+                  {isGuestScopedLevel(editFormData.access_type) && (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[12px] font-bold text-[var(--fg)] uppercase tracking-wider">
@@ -1227,8 +1445,8 @@ export default function ColaboradoresRHPage() {
                     </div>
                   )}
 
-                  {/* Projetos e Listas Liberados (se for Convidado) */}
-                  {editFormData.access_type === 'GUEST' && (
+                  {/* Projetos e Listas Liberados (para todos os níveis de Convidado) */}
+                  {isGuestScopedLevel(editFormData.access_type) && (
                     <div className="flex flex-col gap-3">
                       <span className="text-[12px] font-bold text-[var(--fg)] uppercase tracking-wider">
                         Setores, Projetos & Listas de Tarefas Liberados
@@ -1313,6 +1531,127 @@ export default function ColaboradoresRHPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Matriz Granular de Permissões por Funcionalidade (Ajuste Fino) */}
+                  <div className="p-4 rounded-[14px] bg-[var(--bg)]/50 border border-[var(--line)] flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[12px] font-bold text-[var(--fg)] uppercase tracking-wider block">
+                          Permissões por Funcionalidade (Ajuste Fino)
+                        </span>
+                        <span className="text-[11.5px] text-[var(--ds-muted)]">
+                          Por padrão, o colaborador herda as regras do nível{' '}
+                          <strong>{getAccessLevelMeta(editFormData.access_type).label}</strong>. Você pode conceder ou revogar ações individuais abaixo.
+                        </span>
+                      </div>
+                      {Object.keys(editFormData.custom_permissions || {}).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setEditFormData({ ...editFormData, custom_permissions: {} })}
+                          className="text-[11px] font-semibold text-[#0066FF] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Restaurar padrão do nível
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-[300px] overflow-y-auto pr-1 flex flex-col gap-1.5">
+                      {FEATURE_PERMISSION_CATALOG.map((feat) => {
+                        const normalizedLvl = normalizeAccessType(editFormData.access_type)
+                        const inheritedAllowed =
+                          normalizedLvl === 'ADMIN' ||
+                          feat.defaultLevels.includes(normalizedLvl)
+                        const overrides = editFormData.custom_permissions || {}
+                        const hasOverride = Object.prototype.hasOwnProperty.call(overrides, feat.key)
+                        const overrideVal = hasOverride ? overrides[feat.key] : undefined
+                        const effectiveAllowed =
+                          typeof overrideVal === 'boolean' ? overrideVal : inheritedAllowed
+
+                        const setOverride = (mode: 'default' | 'allow' | 'deny') => {
+                          const next = { ...(editFormData.custom_permissions || {}) }
+                          if (mode === 'default') {
+                            delete next[feat.key]
+                          } else if (mode === 'allow') {
+                            next[feat.key] = true
+                          } else {
+                            next[feat.key] = false
+                          }
+                          setEditFormData({ ...editFormData, custom_permissions: next })
+                        }
+
+                        return (
+                          <div
+                            key={feat.key}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 rounded-[10px] border transition-colors ${
+                              hasOverride
+                                ? 'bg-[var(--surface)] border-[#0066FF]/40'
+                                : 'bg-[var(--surface)]/60 border-[var(--line)]'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] text-[var(--ds-muted)]">
+                                  {feat.module}
+                                </span>
+                                <span className="text-[12.5px] font-semibold text-[var(--fg)]">
+                                  {feat.label}
+                                </span>
+                                {hasOverride && (
+                                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[#0066FF]/15 text-[#0066FF]">
+                                    Personalizado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[var(--ds-muted)] mt-0.5 leading-snug">
+                                {feat.description}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0 bg-[var(--bg)] p-1 rounded-[8px] border border-[var(--line)]">
+                              <button
+                                type="button"
+                                onClick={() => setOverride('default')}
+                                className={`px-2 py-1 rounded-[6px] text-[10.5px] font-medium transition-colors cursor-pointer ${
+                                  !hasOverride
+                                    ? 'bg-[var(--surface)] text-[var(--fg)] shadow-sm border border-[var(--line)]'
+                                    : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
+                                }`}
+                                title={`Herdar padrão do nível (${inheritedAllowed ? 'Permitido' : 'Bloqueado'})`}
+                              >
+                                Padrão ({inheritedAllowed ? 'Sim' : 'Não'})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOverride('allow')}
+                                className={`px-2 py-1 rounded-[6px] text-[10.5px] font-semibold transition-colors cursor-pointer ${
+                                  overrideVal === true
+                                    ? 'bg-[#22c55e] text-white'
+                                    : effectiveAllowed && !hasOverride
+                                    ? 'text-[#22c55e]/70 hover:bg-[#22c55e]/10'
+                                    : 'text-[var(--ds-muted)] hover:text-[#22c55e]'
+                                }`}
+                              >
+                                Permitir
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOverride('deny')}
+                                className={`px-2 py-1 rounded-[6px] text-[10.5px] font-semibold transition-colors cursor-pointer ${
+                                  overrideVal === false
+                                    ? 'bg-[#ef4444] text-white'
+                                    : !effectiveAllowed && !hasOverride
+                                    ? 'text-[#ef4444]/70 hover:bg-[#ef4444]/10'
+                                    : 'text-[var(--ds-muted)] hover:text-[#ef4444]'
+                                }`}
+                              >
+                                Bloquear
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1521,12 +1860,12 @@ export default function ColaboradoresRHPage() {
 
               <div
                 onClick={() => {
-                  if (inviteForm.email.trim() && inviteForm.access_type === 'GUEST') setInviteStep(3)
+                  if (inviteForm.email.trim() && isGuestScopedLevel(inviteForm.access_type)) setInviteStep(3)
                 }}
                 className={`flex items-center gap-2 transition-colors ${
                   inviteStep === 3
                     ? 'text-[#0066FF] font-semibold'
-                    : inviteForm.email.trim() && inviteForm.access_type === 'GUEST'
+                    : inviteForm.email.trim() && isGuestScopedLevel(inviteForm.access_type)
                     ? 'text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer'
                     : 'text-[var(--ds-muted)] opacity-50 cursor-not-allowed'
                 }`}
@@ -1550,81 +1889,144 @@ export default function ColaboradoresRHPage() {
               {/* ETAPA 1: E-MAIL E NÍVEL DE ACESSO */}
               {/* =================================================================== */}
               {inviteStep === 1 && (
-                <div className="flex flex-col gap-5 animate-in fade-in duration-200">
+                <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                  {inviteError && (
+                    <div className="p-3 rounded-[10px] bg-[#ef4444]/10 border border-[#ef4444]/40 text-[#ef4444] text-[12.5px] font-medium">
+                      {inviteError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase mb-1.5">
+                        Nome Completo
+                      </label>
+                      <input
+                        type="text"
+                        value={inviteForm.full_name}
+                        onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
+                        placeholder="Ex: João Silva"
+                        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[12px] px-3.5 py-2.5 text-[13.5px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase mb-1.5">
+                        E-mail de Acesso *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        autoFocus
+                        value={inviteForm.email}
+                        onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                        placeholder="nome@coytech.com.br"
+                        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[12px] px-3.5 py-2.5 text-[13.5px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase mb-1.5">
-                      E-mail do Colaborador *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      autoFocus
-                      value={inviteForm.email}
-                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                      placeholder="exemplo@empresa.com"
-                      className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[12px] px-3.5 py-2.5 text-[13.5px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
-                    />
-                    <div className="flex items-center gap-1.5 mt-2 text-[12px] text-[var(--ds-muted)] bg-[var(--bg)]/60 p-2.5 rounded-[10px] border border-[var(--line)]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase">
+                        Definir Senha de Acesso *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInviteForm({ ...inviteForm, password: generateStrongPassword(10) })
+                          setShowInvitePassword(true)
+                        }}
+                        className="text-[11px] font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                      >
+                        Gerar senha forte
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showInvitePassword ? 'text' : 'password'}
+                        value={inviteForm.password}
+                        onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })}
+                        placeholder="Mínimo 6 caracteres"
+                        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-[12px] pl-3.5 pr-10 py-2.5 text-[13.5px] font-mono text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowInvitePassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+                      >
+                        {showInvitePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 text-[11.5px] text-[var(--ds-muted)] bg-[var(--bg)]/60 p-2.5 rounded-[10px] border border-[var(--line)]">
                       <Info className="w-4 h-4 text-[#0066FF] shrink-0" />
                       <span>
-                        O <strong>Nome</strong> e o <strong>WhatsApp</strong> serão vinculados automaticamente quando o colaborador realizar o login.
+                        Com e-mail e senha definidos, o acesso é liberado na hora. Tanto você quanto o colaborador podem trocar a senha depois.
                       </span>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-2.5">
-                    <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase">
-                      Escolha o Nível de Acesso
-                    </label>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label
-                        className={`flex items-start gap-3 p-3.5 rounded-[14px] border cursor-pointer transition-all ${
-                          inviteForm.access_type === 'MEMBER'
-                            ? 'bg-[#5cd3a8]/10 border-[#5cd3a8] shadow-sm'
-                            : 'bg-[var(--bg)] border-[var(--line)] hover:border-[var(--line2)] text-[var(--ds-muted)]'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="step1_access_type"
-                          checked={inviteForm.access_type === 'MEMBER'}
-                          onChange={() => setInviteForm({ ...inviteForm, access_type: 'MEMBER' })}
-                          className="mt-1"
-                        />
-                        <div>
-                          <div className="font-semibold text-[13px] text-[var(--fg)] flex items-center gap-1.5">
-                            <Shield className="w-4 h-4 text-[#5cd3a8]" /> Membro (Full)
-                          </div>
-                          <div className="text-[11.5px] mt-0.5 text-[var(--ds-muted)]">
-                            Acesso total a todas as telas, tarefas, clientes e projetos do workspace.
-                          </div>
-                        </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase">
+                        Escolha o Nível de Acesso
                       </label>
+                      <span className="text-[11px] text-[var(--ds-muted)]">
+                        {isGuestScopedLevel(inviteForm.access_type)
+                          ? 'Escopo de telas e pastas selecionado na etapa 3'
+                          : 'Acesso global ao workspace'}
+                      </span>
+                    </div>
 
-                      <label
-                        className={`flex items-start gap-3 p-3.5 rounded-[14px] border cursor-pointer transition-all ${
-                          inviteForm.access_type === 'GUEST'
-                            ? 'bg-[#e8c14a]/10 border-[#e8c14a] shadow-sm'
-                            : 'bg-[var(--bg)] border-[var(--line)] hover:border-[var(--line2)] text-[var(--ds-muted)]'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="step1_access_type"
-                          checked={inviteForm.access_type === 'GUEST'}
-                          onChange={() => setInviteForm({ ...inviteForm, access_type: 'GUEST' })}
-                          className="mt-1"
-                        />
-                        <div>
-                          <div className="font-semibold text-[13px] text-[var(--fg)] flex items-center gap-1.5">
-                            <Lock className="w-4 h-4 text-[#e8c14a]" /> Convidado (Restrito)
-                          </div>
-                          <div className="text-[11.5px] mt-0.5 text-[var(--ds-muted)]">
-                            Acesso cirúrgico limitado apenas às telas e projetos que você autorizar.
-                          </div>
-                        </div>
-                      </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {ACCESS_LEVELS_META.map((lvl) => {
+                        const isSelected = normalizeAccessType(inviteForm.access_type) === lvl.value
+                        return (
+                          <label
+                            key={lvl.value}
+                            className={`flex items-start gap-2.5 p-3 rounded-[14px] border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'shadow-sm text-[var(--fg)]'
+                                : 'bg-[var(--bg)] border-[var(--line)] hover:border-[var(--line2)] text-[var(--ds-muted)]'
+                            }`}
+                            style={
+                              isSelected
+                                ? {
+                                    borderColor: lvl.badgeColor,
+                                    backgroundColor: `${lvl.badgeColor}14`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            <input
+                              type="radio"
+                              name="step1_access_type"
+                              checked={isSelected}
+                              onChange={() => setInviteForm({ ...inviteForm, access_type: lvl.value })}
+                              className="mt-1 accent-[#0066FF]"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-[12.5px] text-[var(--fg)]">
+                                  {lvl.label}
+                                </span>
+                                <span
+                                  className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                  style={{
+                                    backgroundColor: `${lvl.badgeColor}20`,
+                                    color: lvl.badgeColor,
+                                  }}
+                                >
+                                  {lvl.group === 'CONVIDADO' ? 'Convidado' : 'Equipe'}
+                                </span>
+                              </div>
+                              <div className="text-[11px] mt-0.5 text-[var(--ds-muted)] leading-snug">
+                                {lvl.description}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1705,13 +2107,14 @@ export default function ColaboradoresRHPage() {
                       })}
                     </div>
 
-                    {inviteForm.access_type === 'MEMBER' ? (
+                    {!isGuestScopedLevel(inviteForm.access_type) ? (
                       <p className="text-[11px] text-[#5cd3a8] mt-1">
-                        ✓ Como você selecionou <strong>Membro</strong>, este colaborador terá acesso a todas as áreas.
+                        Como você selecionou <strong>{getAccessLevelMeta(inviteForm.access_type).label}</strong>, este colaborador terá acesso global ao workspace.
                       </p>
                     ) : (
                       <p className="text-[11px] text-[var(--ds-muted)] mt-1">
-                        ℹ️ Na próxima etapa você poderá personalizar ou marcar/desmarcar qualquer tela individualmente.
+                        Na próxima etapa você poderá personalizar telas, pastas autorizadas e permissões de{' '}
+                        <strong>{getAccessLevelMeta(inviteForm.access_type).label}</strong>.
                       </p>
                     )}
                   </div>
@@ -1851,17 +2254,58 @@ export default function ColaboradoresRHPage() {
 
                   <div className="flex flex-col gap-1">
                     <h3 className="text-xl font-bold text-[var(--fg)]">
-                      Convite Registrado com Sucesso!
+                      Acesso Criado com Sucesso!
                     </h3>
                     <p className="text-[13px] text-[var(--ds-muted)] max-w-md">
                       O acesso para <strong className="text-[var(--fg)]">{inviteResult.email}</strong> foi configurado no workspace <strong>{currentOrg.name}</strong>.
                     </p>
                   </div>
 
+                  {/* CREDENCIAIS DEFINIDAS (E-MAIL E SENHA) */}
+                  {inviteResult.password && (
+                    <div className="w-full text-left p-4 rounded-[14px] bg-[var(--bg)] border border-[#0066FF]/40 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11.5px] font-bold text-[#0066FF] uppercase tracking-wider flex items-center gap-1.5">
+                          <KeyRound className="w-3.5 h-3.5" /> Credenciais de Acesso Imediato
+                        </span>
+                        <span className="text-[11px] font-medium text-[#2F9E5A]">Conta Ativa</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[12px]">
+                        <div className="p-2.5 rounded-[8px] bg-[var(--surface)] border border-[var(--line)]">
+                          <span className="text-[10.5px] text-[var(--ds-muted)] block">E-mail:</span>
+                          <span className="font-mono font-semibold text-[var(--fg)] select-all">{inviteResult.email}</span>
+                        </div>
+                        <div className="p-2.5 rounded-[8px] bg-[var(--surface)] border border-[var(--line)]">
+                          <span className="text-[10.5px] text-[var(--ds-muted)] block">Senha:</span>
+                          <span className="font-mono font-semibold text-[var(--fg)] select-all">{inviteResult.password}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const text = `Acesso CoyDash (${currentOrg.name})\nLink: ${window.location.origin}/login?email=${encodeURIComponent(inviteResult.email)}\nE-mail: ${inviteResult.email}\nSenha: ${inviteResult.password}`
+                          navigator.clipboard.writeText(text)
+                          setCopiedLink(true)
+                          setTimeout(() => setCopiedLink(false), 2500)
+                        }}
+                        className="w-full h-[38px] rounded-[10px] bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] font-semibold text-[12.5px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedLink ? 'Credenciais Copiadas!' : 'Copiar E-mail, Senha e Link'}</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* STATUS DO E-MAIL */}
                   <div className="w-full text-left p-3.5 rounded-[12px] bg-[var(--bg)] border border-[var(--line2)] text-[12px] flex flex-col gap-1.5">
                     <div className="flex items-center gap-2 font-semibold">
-                      {inviteResult.alreadyRegistered ? (
+                      {inviteResult.passwordSet ? (
+                        <span className="text-[#2f9e5a] flex items-center gap-1.5">
+                          <Check className="w-4 h-4" /> Login e senha prontos para uso imediato
+                        </span>
+                      ) : inviteResult.alreadyRegistered ? (
                         <span className="text-[#3b82f6] flex items-center gap-1.5">
                           <Info className="w-4 h-4" /> Usuário já possui conta no sistema
                         </span>
@@ -1876,16 +2320,16 @@ export default function ColaboradoresRHPage() {
                       )}
                     </div>
                     <p className="text-[11.5px] text-[var(--ds-muted)] leading-relaxed">
-                      {inviteResult.alreadyRegistered
-                        ? 'Este colaborador já está cadastrado. Ele pode acessar imediatamente fazendo login com seu e-mail e sua senha cadastrada.'
-                        : 'Caso o e-mail atrase ou caia na pasta de Spam/Lixo Eletrônico, utilize o link de acesso rápido abaixo para liberar o acesso imediatamente.'}
+                      {inviteResult.passwordSet
+                        ? 'O colaborador já pode acessar em /login com o e-mail e senha definidos acima. Ele poderá alterar a senha depois em Configurações.'
+                        : 'Caso o e-mail atrase, utilize o link de acesso rápido abaixo para liberar o acesso imediatamente.'}
                     </p>
                   </div>
 
                   {/* LINK DIRETO DE ACESSO */}
                   <div className="w-full flex flex-col gap-2 text-left">
                     <label className="text-[11.5px] font-semibold uppercase text-[var(--ds-muted)]">
-                      Link Direto de Acesso / Convite
+                      Link Direto de Login
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -1900,19 +2344,10 @@ export default function ColaboradoresRHPage() {
                           setCopiedLink(true)
                           setTimeout(() => setCopiedLink(false), 2500)
                         }}
-                        className="h-[42px] px-4 rounded-[10px] bg-[#0066FF] hover:bg-[#0052CC] text-white font-semibold text-[12.5px] flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+                        className="h-[42px] px-4 rounded-[10px] bg-[var(--surface)] border border-[var(--line2)] hover:border-[#0066FF] text-[var(--fg)] font-semibold text-[12.5px] flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
                       >
-                        {copiedLink ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            <span>Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span>Copiar</span>
-                          </>
-                        )}
+                        <Copy className="w-4 h-4" />
+                        <span>Copiar Link</span>
                       </button>
                     </div>
                   </div>
@@ -1921,11 +2356,13 @@ export default function ColaboradoresRHPage() {
                   <div className="w-full flex items-center justify-between p-3 rounded-[12px] bg-[#25d366]/10 border border-[#25d366]/20">
                     <div className="flex items-center gap-2.5 text-[12px]">
                       <MessageSquare className="w-4 h-4 text-[#25d366]" />
-                      <span className="text-[var(--fg)] font-medium">Enviar convite no WhatsApp</span>
+                      <span className="text-[var(--fg)] font-medium">Enviar acesso no WhatsApp</span>
                     </div>
                     <a
                       href={`https://wa.me/?text=${encodeURIComponent(
-                        `Olá! Você foi convidado para o workspace da Coytech no cargo de ${inviteForm.job_title}. Acesse seu painel pelo link: ${inviteResult.inviteLink}`
+                        inviteResult.password
+                          ? `Olá! Seu acesso ao workspace da Coytech (${inviteForm.job_title}) foi liberado.\nLink: ${typeof window !== 'undefined' ? window.location.origin : ''}/login?email=${encodeURIComponent(inviteResult.email)}\nE-mail: ${inviteResult.email}\nSenha: ${inviteResult.password}`
+                          : `Olá! Você foi convidado para o workspace da Coytech no cargo de ${inviteForm.job_title}. Acesse seu painel pelo link: ${inviteResult.inviteLink}`
                       )}`}
                       target="_blank"
                       rel="noreferrer"
@@ -1989,7 +2426,7 @@ export default function ColaboradoresRHPage() {
 
                     {inviteStep === 2 && (
                       <>
-                        {inviteForm.access_type === 'MEMBER' ? (
+                        {!isGuestScopedLevel(inviteForm.access_type) ? (
                           <button
                             type="button"
                             disabled={isSendingInvite}
@@ -1997,7 +2434,11 @@ export default function ColaboradoresRHPage() {
                             className="px-5 py-2 rounded-[10px] bg-[#0066FF] text-white font-semibold text-[13px] hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-md"
                           >
                             <Send className="w-3.5 h-3.5" />
-                            <span>{isSendingInvite ? 'Enviando convite...' : 'Enviar Convite (Acesso Full)'}</span>
+                            <span>
+                              {isSendingInvite
+                                ? 'Criando acesso...'
+                                : `Criar Acesso (${getAccessLevelMeta(inviteForm.access_type).shortLabel})`}
+                            </span>
                           </button>
                         ) : (
                           <button

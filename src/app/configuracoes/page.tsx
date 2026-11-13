@@ -11,6 +11,9 @@ import {
   Wallet,
   Bot,
   Plug,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { useCoyDash } from '@/lib/coydash-store'
 import type { OrganizationSettings } from '@/types/coydash'
@@ -49,6 +52,7 @@ const GATEWAY_TABS: {
 
 export default function ConfiguracoesPage() {
   const {
+    authenticatedUser,
     currentOrg,
     updateOrganizationMetrics,
     orgSettings,
@@ -61,6 +65,48 @@ export default function ConfiguracoesPage() {
   const [orgName, setOrgName] = useState(currentOrg.name)
   const [orgCnpj, setOrgCnpj] = useState(currentOrg.cnpj || '12.345.678/0001-90')
   const [whatsappNum, setWhatsappNum] = useState(orgSettings.whatsapp_number)
+
+  // Troca de senha do próprio usuário logado
+  const [ownNewPassword, setOwnNewPassword] = useState('')
+  const [ownConfirmPassword, setOwnConfirmPassword] = useState('')
+  const [showOwnPwd, setShowOwnPwd] = useState(false)
+  const [isUpdatingOwnPwd, setIsUpdatingOwnPwd] = useState(false)
+  const [ownPwdFeedback, setOwnPwdFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const handleChangeOwnPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setOwnPwdFeedback(null)
+
+    if (ownNewPassword.length < 6) {
+      setOwnPwdFeedback({ type: 'error', text: 'A nova senha precisa ter pelo menos 6 caracteres.' })
+      return
+    }
+    if (ownNewPassword !== ownConfirmPassword) {
+      setOwnPwdFeedback({ type: 'error', text: 'As senhas digitadas não coincidem.' })
+      return
+    }
+
+    setIsUpdatingOwnPwd(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: ownNewPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setOwnPwdFeedback({ type: 'error', text: data.error || 'Falha ao atualizar senha.' })
+      } else {
+        setOwnNewPassword('')
+        setOwnConfirmPassword('')
+        setOwnPwdFeedback({ type: 'success', text: 'Sua senha foi atualizada com sucesso!' })
+      }
+    } catch {
+      setOwnPwdFeedback({ type: 'error', text: 'Erro de conexão ao tentar atualizar a senha.' })
+    } finally {
+      setIsUpdatingOwnPwd(false)
+    }
+  }
 
   // Modal Gateway Pix (4 Abas)
   const [showGatewayModal, setShowGatewayModal] = useState(false)
@@ -137,6 +183,83 @@ export default function ConfiguracoesPage() {
             <span>Salvar alterações</span>
           )}
         </button>
+      </div>
+
+      {/* CARD: MINHA CONTA & TROCA DE SENHA DO USUÁRIO LOGADO */}
+      <div className="bg-[var(--surface)] border border-[var(--line2)] rounded-[16px] p-[20px] flex flex-col gap-[14px]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-[12px]">
+            <div className="w-[40px] h-[40px] rounded-[12px] bg-[#0066FF]/15 text-[#0066FF] grid place-items-center shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-bold">Minha Conta &amp; Segurança</h2>
+              <p className="text-[12px] text-[var(--ds-muted)]">
+                Conectado como <strong className="text-[var(--fg)]">{authenticatedUser?.email || 'Usuário'}</strong> · Altere sua senha de acesso abaixo
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {ownPwdFeedback && (
+          <div
+            className={`p-3 rounded-[10px] text-[12.5px] font-medium border ${
+              ownPwdFeedback.type === 'success'
+                ? 'bg-[#2F9E5A]/10 border-[#2F9E5A]/40 text-[#2F9E5A]'
+                : 'bg-[#ef4444]/10 border-[#ef4444]/40 text-[#ef4444]'
+            }`}
+          >
+            {ownPwdFeedback.text}
+          </div>
+        )}
+
+        <form onSubmit={handleChangeOwnPassword} className="grid grid-cols-1 md:grid-cols-3 gap-[12px] items-end">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase">
+              Nova Senha
+            </label>
+            <div className="relative">
+              <input
+                type={showOwnPwd ? 'text' : 'password'}
+                required
+                value={ownNewPassword}
+                onChange={(e) => setOwnNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="w-full h-[40px] pl-3 pr-9 rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] text-[13px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowOwnPwd((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+              >
+                {showOwnPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11.5px] font-semibold text-[var(--ds-muted)] uppercase">
+              Confirmar Nova Senha
+            </label>
+            <input
+              type={showOwnPwd ? 'text' : 'password'}
+              required
+              value={ownConfirmPassword}
+              onChange={(e) => setOwnConfirmPassword(e.target.value)}
+              placeholder="Repita a nova senha"
+              className="w-full h-[40px] px-3 rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] text-[13px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isUpdatingOwnPwd}
+            className="h-[40px] px-[20px] rounded-full bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] font-semibold text-[13px] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>{isUpdatingOwnPwd ? 'Atualizando...' : 'Atualizar Minha Senha'}</span>
+          </button>
+        </form>
       </div>
 
       {/* CARD DESTACADO: CONTA BANCÁRIA & GATEWAY PIX AUTOMÁTICO (IGUAL AO RANGOLIVRE) */}

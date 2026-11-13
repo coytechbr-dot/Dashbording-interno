@@ -348,3 +348,21 @@
   - Utilitário `isTaskAssignedToUser` em `src/lib/task-utils.ts`.
 - [x] **TASK-15.5 — Atualização do Planejamento Estratégico COYTECH:**
   - Atualização no Supabase de todas as 27 tarefas das 5 fases vinculando `Coytech` e `coytechbr@gmail.com` como responsáveis para visibilidade imediata.
+
+---
+
+## 🚀 FASE 16 — Ordens de Serviço (O.S.) em 3 Etapas para Clientes, Novo Layout de Demandas com Kanban Embutido e Solicitação de Proposta Comercial para Leads
+**Tese:** Proporcionar uma esteira sem fricção para emitir ordens de serviço guiadas a partir do cliente e converter leads de atendimento ou oportunidades do comercial em propostas comerciais acionáveis como tarefas de equipe.
+
+- [x] **TASK-16.1 — Provisionamento Automático de Pastas e Listas (`task-lists-helper.ts`):**
+  - Criação de helper para assegurar as pastas `Clientes - Tarefas` (com lista `Ordens de Serviço`) e `Leads - Tarefas` (com lista `Proposta Comercial`).
+- [x] **TASK-16.2 — Emissor Guiado de Ordens de Serviço (O.S.) em 3 Etapas (`order-service-dialog.tsx`):**
+  - Pop-up com Stepper em 3 fases (Briefing & Setor, Prazos & Entregáveis com checklist dinâmico, e Resumo Executivo & Emissão com 1 clique).
+- [x] **TASK-16.3 — Novo Layout da Aba de Demandas do Cliente (`client-demands-tab.tsx`):**
+  - Dashboard de métricas (Total, Em Andamento, Concluídas), visualização dupla via abas (Lista com Cards Ricos vs. Quadro Kanban Embutido dentro da Ficha 360º), atalho para o Kanban Geral e abertura de edição no `TaskDialog`.
+- [x] **TASK-16.4 — Compilação e Solicitação de Proposta Comercial a partir de Leads (`proposal-task-helper.ts`):**
+  - Compilação dos dados do lead, memórias registradas, histórico de mensagens e notas comerciais para criar tarefas estruturadas em `Leads - Tarefas -> Proposta Comercial`.
+- [x] **TASK-16.5 — Ações Rápidas no Atendimento e CRM Comercial:**
+  - Botão de solicitar proposta integrado na gaveta de chat ativa (`activeConv`), no modal de detalhes do lead, nos cards do Kanban e na tabela CRM em `/atendimento`, e no card de negócios (`DealCard`) em `/comercial`.
+- [x] **TASK-16.6 — Governança RBAC e Validação TypeScript:**
+  - Inclusão das permissões `clients.create_order_service`, `clients.view_demands_kanban` e `leads.request_commercial_proposal` em `spec/coydash_funcionalidades_e_permissoes.md`, `src/lib/access-control.ts` e validação com `npx tsc --noEmit` (0 erros).

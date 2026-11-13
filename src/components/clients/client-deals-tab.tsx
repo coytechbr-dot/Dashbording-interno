@@ -60,7 +60,7 @@ export function ClientDealsTab({
       <div className="flex flex-wrap items-center justify-between gap-[12px] border-b border-[var(--line)] pb-[14px]">
         <div>
           <div className="flex items-center gap-[8px]">
-            <Briefcase className="w-4 h-4 text-[#F0521F]" />
+            <Briefcase className="w-4 h-4 text-[#0066FF]" />
             <h2 className="text-[16px] font-bold text-[var(--fg)]">
               Oportunidades Comerciais & Propostas · {clientName}
             </h2>
@@ -76,9 +76,9 @@ export function ClientDealsTab({
         <div className="flex items-center gap-[8px]">
           <Link
             href="/comercial"
-            className="h-[36px] px-[12px] rounded-full bg-[var(--bg)] border border-[var(--line2)] hover:border-[#F0521F] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors"
+            className="h-[36px] px-[12px] rounded-full bg-[var(--bg)] border border-[var(--line2)] hover:border-[#0066FF] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors"
           >
-            <Layers className="w-3.5 h-3.5 text-[#F0521F]" />
+            <Layers className="w-3.5 h-3.5 text-[#0066FF]" />
             <span>Ver Funil Geral</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
           </Link>
@@ -86,7 +86,7 @@ export function ClientDealsTab({
           <button
             type="button"
             onClick={onOpenNewDeal}
-            className="h-[36px] px-[14px] rounded-full bg-[#141414] text-[#F4F4F2] text-[12px] font-semibold hover:bg-[#F0521F] flex items-center gap-[6px] transition-colors cursor-pointer"
+            className="h-[36px] px-[14px] rounded-full bg-[#141414] text-[#F4F4F2] text-[12px] font-semibold hover:bg-[#0066FF] flex items-center gap-[6px] transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Nova Oportunidade</span>
@@ -108,7 +108,7 @@ export function ClientDealsTab({
 
         <div className="p-[12px] rounded-[12px] bg-[var(--bg)] border border-[var(--line2)] flex flex-col gap-[4px]">
           <span className="text-[11px] font-semibold text-[var(--ds-muted)] flex items-center gap-[4px]">
-            <TrendingUp className="w-3 h-3 text-[#F0521F]" />
+            <TrendingUp className="w-3 h-3 text-[#0066FF]" />
             Setup Total
           </span>
           <span className="text-[16px] font-bold text-[var(--fg)]">
@@ -152,9 +152,9 @@ export function ClientDealsTab({
           <button
             type="button"
             onClick={onOpenNewDeal}
-            className="h-[34px] px-[14px] rounded-full bg-[var(--surface)] border border-[var(--line2)] hover:border-[#F0521F] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
+            className="h-[34px] px-[14px] rounded-full bg-[var(--surface)] border border-[var(--line2)] hover:border-[#0066FF] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-[#F0521F]" />
+            <Plus className="w-3.5 h-3.5 text-[#0066FF]" />
             <span>Criar Primeira Oportunidade</span>
           </button>
         </div>
@@ -205,7 +205,7 @@ export function ClientDealsTab({
                     </div>
                     <div>
                       <span className="text-[10.5px] text-[var(--ds-muted)] block">Taxa de Setup</span>
-                      <span className="text-[13px] font-bold text-[#F0521F]">
+                      <span className="text-[13px] font-bold text-[#0066FF]">
                         {formatCurrency(deal.value_setup)}
                       </span>
                     </div>

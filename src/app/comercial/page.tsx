@@ -29,6 +29,7 @@ import { useCoyDash, DEFAULT_INITIAL_PIPELINE, DEFAULT_INITIAL_STAGES } from '@/
 import { DealCard } from '@/components/commercial/deal-card'
 import { DealDialog } from '@/components/commercial/deal-dialog'
 import { CoyDataGrid, type DataGridColumn } from '@/components/crm/coy-data-grid'
+import { createCommercialProposalTaskFromLead } from '@/lib/proposal-task-helper'
 import type { DealItem, PipelineItem, PipelineStageItem } from '@/types/coydash'
 
 function formatCurrency(val?: number): string {
@@ -48,6 +49,12 @@ export default function ComercialPage() {
     createPipeline,
     refreshFromDatabase,
     currentOrg,
+    taskFolders,
+    taskLists,
+    createTaskFolder,
+    createTaskList,
+    createTask,
+    authenticatedUser,
   } = useCoyDash()
 
   // 1. Estado do Pipeline Selecionado
@@ -197,6 +204,46 @@ export default function ComercialPage() {
     }
   }
 
+  const handleRequestProposalFromDeal = async (deal: DealItem) => {
+    try {
+      const clientName = deal.client_name || deal.title || 'Cliente'
+      const task = await createCommercialProposalTaskFromLead(
+        {
+          leadName: deal.client_name || deal.title,
+          leadPhone: deal.lead_id || undefined,
+          companyName: deal.client_name || undefined,
+          clientId: deal.client_id || undefined,
+          clientNameSnapshot: clientName,
+          requestingUserName: authenticatedUser?.name || 'Felipe Cavalcante',
+          closerName: deal.assigned_member_name || undefined,
+          notes: deal.notes,
+          estimatedValue: deal.value_mrr || deal.value_setup || undefined,
+          origin: `Funil Comercial (${deal.title})`,
+        },
+        {
+          taskFolders,
+          taskLists,
+          createTaskFolder,
+          createTaskList,
+          createTask,
+          refreshFromDatabase,
+        }
+      )
+
+      if (task) {
+        setFeedbackMsg({
+          type: 'success',
+          text: `📄 Proposta Comercial solicitada! A tarefa foi gerada em "Leads - Tarefas" -> "Proposta Comercial".`,
+        })
+      }
+    } catch (err) {
+      setFeedbackMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Falha ao gerar proposta comercial',
+      })
+    }
+  }
+
   const handleCreateDefaultPipeline = async () => {
     const pipeName = prompt('Nome do novo funil de vendas:', 'Expansão & Upsell')
     if (pipeName) {
@@ -316,7 +363,7 @@ export default function ComercialPage() {
           const map = {
             low: { label: 'Baixa', dot: 'bg-[#2f9e5a]' },
             medium: { label: 'Média', dot: 'bg-[#38bdf8]' },
-            high: { label: 'Alta', dot: 'bg-[#f0521f]' },
+            high: { label: 'Alta', dot: 'bg-[#0066FF]' },
             urgent: { label: 'Urgente', dot: 'bg-[#ef4444]' },
           }
           const item = map[d.priority || 'medium'] || map.medium
@@ -379,7 +426,7 @@ export default function ComercialPage() {
             <h1 className="text-[26px] font-bold tracking-[-0.5px] leading-tight text-[var(--fg)]">
               Comercial & Vendas
             </h1>
-            <span className="px-[8px] py-[2px] rounded-full text-[11px] font-bold bg-[#f0521f]/15 text-[#f0521f] border border-[#f0521f]/30">
+            <span className="px-[8px] py-[2px] rounded-full text-[11px] font-bold bg-[#0066FF]/15 text-[#0066FF] border border-[#0066FF]/30">
               CoyCRM
             </span>
           </div>
@@ -432,7 +479,7 @@ export default function ComercialPage() {
               onClick={() => setViewMode('KANBAN')}
               className={`h-[34px] px-[12px] rounded-full text-[12px] font-semibold flex items-center gap-[6px] transition-colors cursor-pointer ${
                 viewMode === 'KANBAN'
-                  ? 'bg-[#f0521f] text-[#141414]'
+                  ? 'bg-[#0066FF] text-[#141414]'
                   : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
               }`}
             >
@@ -445,7 +492,7 @@ export default function ComercialPage() {
               onClick={() => setViewMode('LIST')}
               className={`h-[34px] px-[12px] rounded-full text-[12px] font-semibold flex items-center gap-[6px] transition-colors cursor-pointer ${
                 viewMode === 'LIST'
-                  ? 'bg-[#f0521f] text-[#141414]'
+                  ? 'bg-[#0066FF] text-[#141414]'
                   : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
               }`}
             >
@@ -464,7 +511,7 @@ export default function ComercialPage() {
             className="h-[40px] px-[14px] rounded-full bg-[var(--surface)] hover:bg-[var(--line2)] border border-[var(--line2)] text-[12.5px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
             title="Recarregar oportunidades do banco"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-[#f0521f]" />
+            <RefreshCw className="w-3.5 h-3.5 text-[#0066FF]" />
             <span>Atualizar</span>
           </button>
 
@@ -472,7 +519,7 @@ export default function ComercialPage() {
           <button
             type="button"
             onClick={() => handleOpenCreateDeal()}
-            className="h-[40px] px-[18px] rounded-full bg-[#f0521f] hover:bg-[#ff6a36] text-[#141414] font-bold text-[13px] flex items-center gap-[8px] transition-colors shadow-sm cursor-pointer"
+            className="h-[40px] px-[18px] rounded-full bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] font-bold text-[13px] flex items-center gap-[8px] transition-colors shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Nova Oportunidade</span>
@@ -527,7 +574,7 @@ export default function ComercialPage() {
         <div className="p-[16px] rounded-[16px] bg-[var(--surface)] border border-[var(--line2)] flex flex-col justify-between shadow-sm">
           <div className="flex items-center justify-between text-[11.5px] text-[var(--ds-muted)] font-semibold">
             <span>TOTAL EM SETUP</span>
-            <TrendingUp className="w-4 h-4 text-[#f0521f]" />
+            <TrendingUp className="w-4 h-4 text-[#0066FF]" />
           </div>
           <div className="mt-[10px]">
             <div className="text-[22px] font-bold text-[var(--fg)] tracking-tight">
@@ -669,6 +716,7 @@ export default function ComercialPage() {
                             onEdit={handleEditDeal}
                             onDelete={handleDeleteDeal}
                             onConvert={handleConvertDeal}
+                            onRequestProposal={handleRequestProposalFromDeal}
                           />
                         ))}
                         {provided.placeholder}
@@ -681,7 +729,7 @@ export default function ComercialPage() {
                             <button
                               type="button"
                               onClick={() => handleOpenCreateDeal(stage.id)}
-                              className="text-[11px] text-[#f0521f] font-semibold hover:underline cursor-pointer"
+                              className="text-[11px] text-[#0066FF] font-semibold hover:underline cursor-pointer"
                             >
                               + Adicionar deal
                             </button>

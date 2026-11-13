@@ -1,16 +1,17 @@
-# DESIGN — Design System Oficial (Idêntico ao ROOMIE OFFICE AI)
+# DESIGN — Design System Oficial (CoyDash — Identidade Azul Elétrico)
 
-> **REGRA INVIOLÁVEL DO PROJETO COYDASH:** Usar **exatamente** o Design System do projeto `C:\Espaço de Trabalho\JuriPages\Projetos\ROOMIE OFFICE AI` (`spec/17-spec-design-system/DESIGN-SYSTEM.md`, `docs/DESIGN.md` e `src/app/globals.css`) **sem mudar nada** (mesmas variáveis CSS, mesmas cores fixas e de tema, mesma tipografia `Schibsted Grotesk`, mesmos raios, mesmos componentes, mesmas ilustrações de traço 2px `#141414`, mesmos pontos de status de 5–8px e mesmas regras "Não faça").
+> **REGRA OFICIAL DO PROJETO COYDASH:** O CoyDash adota o **Azul Elétrico `#0066FF`** como único acento de marca e destaque oficial (hover `#0052CC`), com fundo de superfícies adaptáveis claro/escuro, tipografia `Schibsted Grotesk`, ícones Lucide com traço fino, cantos arredondados modernos (12–16px, pílulas de 999px), modais cinematográficas (`bg-black/60 backdrop-blur-sm`) e **dropdowns premium estilizados (`CoyDropdown`) com ícones de tarefas**, eliminando selects nativos sem estilo.
 
 ---
 
 ## 1. Princípios
 
-1. **Um só acento.** Laranja `#F0521F` é a única cor de ação e destaque. Não crie outras cores de marca.
-2. **Escuro por padrão, claro por opção.** Superfícies usam variáveis de tema; só laranja, tinta e papel são fixos.
-3. **Linha, não preenchimento.** Ilustrações e ícones são traço preto; a cor vem do fundo do card.
-4. **Denso, mas calmo.** Pouco texto, hierarquia clara, nada decorativo sem função.
-5. **Tudo em português.** pt-BR, tom direto e amigável.
+1. **Um só acento de marca.** **Azul Elétrico `#0066FF`** (`--color-brand-blue`, hover `#0052CC`) é a única cor de ação, botão primário e destaque. Não usar laranja como cor de destaque.
+2. **Escuro por padrão, claro por opção.** Superfícies usam variáveis de tema; o acento azul, tinta e papel são os pilares de contraste.
+3. **Contraste no Botão Primário.** Textos sobre botões de destaque azul usam `#FFFFFF` (branco puro).
+4. **Linha e Forma Refinadas.** Ilustrações e ícones são traço limpo; nada decorativo sem função.
+5. **Dropdowns & Janelas Premium.** Todas as seleções de listas, fases, clientes e prioridades usam `CoyDropdown` com ícones semânticos, checkmarks e popovers flutuantes com `shadow-2xl`. Janelas modais usam overlay escurecido com blur (`bg-black/60 backdrop-blur-sm`).
+6. **Tudo em português.** pt-BR, tom direto, executivo e amigável.
 
 ---
 
@@ -20,9 +21,11 @@
 
 | Token no design | Variável no código | Hex | Uso |
 |---|---|---|---|
-| Laranja | `--color-brand-orange` | `#F0521F` | Botão primário, item ativo, progresso, card de agente |
-| Laranja hover | `--color-brand-orange-hover` | `#FF6A36` | Hover do primário |
-| Tinta | `--color-brand-ink` | `#141414` | Texto/traço sobre laranja e papel |
+| Azul da Marca | `--color-brand-blue` | `#0066FF` | Botão primário, item ativo, progresso, links de destaque |
+| Azul hover | `--color-brand-blue-hover` | `#0052CC` | Hover do primário |
+| Acento (retrocompat.) | `--color-brand-orange` | `#0066FF` | Redirecionado para azul para compatibilidade de tokens |
+| Acento hover (retro.) | `--color-brand-orange-hover` | `#0052CC` | Redirecionado para azul hover |
+| Tinta | `--color-brand-ink` | `#141414` | Texto/traço sobre papel e fundos claros |
 | Papel | `--color-brand-paper` | `#F4F4F2` | Fundo de cards ilustrados claros |
 
 ### 2.2 De tema (`src/app/globals.css`)
@@ -37,17 +40,18 @@
 | `--hover` | **`--ds-hover`** | `#1E1E1E` | `#EAE8E3` | Hover de menu |
 | `--line` | `--line` | `#232323` | `#E2E0DB` | Divisórias |
 | `--line2` | `--line2` | `#3A3A3A` | `#D4D1CB` | Bordas de campo, trilhos |
-| `--hero` | `--hero` | `#3B1E15` | `#FFDDCC` | Bloco de destaque |
-| `--hero-sub` | `--hero-sub` | `#E8D8D0` | `#7A3A22` | Texto dentro do destaque |
+| `--hero` | `--hero` | `#0D223F` | `#E2EDFD` | Bloco de destaque (azul suave/profundo) |
+| `--hero-sub` | `--hero-sub` | `#93C5FD` | `#1E40AF` | Texto dentro do destaque |
 
-### 2.3 Status (só em pontos de 5–8 px, nunca como fundo)
+### 2.3 Status (só em pontos de 5–8 px ou badges de prioridade)
 
 | Cor | Hex | Significado |
 |---|---|---|
-| Verde | `#2F9E5A` | Online / presença / Disponível |
-| Laranja | `#F0521F` | Tarefa entregue · Evento de equipe |
-| Amarelo | `#E8C14A` | Em andamento · Evento individual |
-| Lilás | `#8F7DFF` | Aguardando você · Evento aberto |
+| Verde | `#2F9E5A` | Online / presença / Concluído |
+| Azul | `#0066FF` | Tarefa entregue · Em andamento do CoyDash |
+| Amarelo / Âmbar | `#E8C14A` | Alta prioridade · Atenção |
+| Vermelho | `#EF4444` | Urgente · Bloqueio · Erro |
+| Lilás | `#8F7DFF` | Aguardando validação · Evento aberto |
 
 ---
 
@@ -57,7 +61,7 @@ Fonte única: **Schibsted Grotesk** (400/500/600/700), carregada por `next/font/
 
 | Estilo | Tamanho / peso / entrelinha | Tracking | Uso |
 |---|---|---|---|
-| Logo | 26 / 700 / 1 | -0.5px | Sempre laranja `#F0521F` |
+| Logo | 26 / 700 / 1 | -0.5px | Sempre azul `#0066FF` |
 | Display | 42 / 600 / 1.02 | -1.4px | Título de login/cadastro |
 | Destaque | 34–40 / 600 / 1.02–1.04 | -1.2 a -1.4px | Boas-vindas, painéis |
 | Título de página | 28 / 600 | -0.8px | Cabeçalho de cada rota |
@@ -80,7 +84,7 @@ Títulos grandes: `text-wrap: balance`.
 | Card de sala | 12–14px |
 | Card de lista / campo | 12px (mobile 14px) |
 | Item de menu | 10px |
-| Botão sobre laranja | 9px |
+| Botão sobre azul | 9px |
 | Tag | 6px |
 | Botões e pílulas | 999px |
 
@@ -93,7 +97,7 @@ Títulos grandes: `text-wrap: balance`.
 ## 5. Ícones
 
 - Grade 16×16, traço **1.4px**, `stroke="currentColor"`.
-- Tinta sobre laranja; `--ds-muted` quando inativos.
+- Branco sobre azul; `--ds-muted` quando inativos; `--color-brand-blue` quando ativos.
 - Biblioteca: `lucide-react` com `strokeWidth={1.4}` (ou os SVGs exatos 16×16 do Design System).
 - A seta **↗** (`ArrowUpRight`) acompanha **todo** botão primário, à direita.
 
@@ -104,54 +108,55 @@ Títulos grandes: `text-wrap: balance`.
 ### Botões
 | Tipo | Especificação |
 |---|---|
-| Primário | Pílula laranja `#F0521F`, texto tinta `#141414` 14/600, seta ↗ à direita (`justify-between`). Hover `#FF6A36`. **Um por tela.** |
+| Primário | Pílula azul `#0066FF`, texto branco `#FFFFFF` 14/600, seta ↗ à direita (`justify-between`). Hover `#0052CC`. **Um por tela.** |
 | Compacto | Igual, 42px de altura, para ações dentro de cards ("Ver entregas") |
-| Sobre laranja | Retângulo tinta `#141414`, raio 9px, texto branco + seta ("Fazer upgrade") |
+| Sobre azul | Retângulo tinta `#141414`, raio 9px, texto branco + seta ("Fazer upgrade") |
 | Social | Pílula `--surface`, inicial dentro de círculo com contorno (Google, Microsoft) |
 | Alternar tema | Círculo 38px `--surface`; sol no escuro, lua no claro |
 
-### Campos
-- Fundo `--surface`, borda 1.5px `--line2`, **borda laranja `#F0521F` no foco**.
+### Campos & Dropdowns
+- Fundo `--surface`, borda 1.5px `--line2`, **borda azul `#0066FF` no foco** com anel suave `ring-2 ring-blue-500/15`.
 - Rótulo acima, 12px `--ds-muted`. No mobile, só placeholder.
-- Força da senha: 4 barras de 3px (laranja = preenchida).
+- **Dropdowns Premium (`CoyDropdown`):** filtros centrais de tarefas, listas, fases, clientes e prioridades utilizam o componente `CoyDropdown`, com ícones temáticos de tarefas e popover suspenso flutuante (`shadow-2xl rounded-xl`).
+- Força da senha: 4 barras de 3px (azul = preenchida).
 
 ### Seleção
-- **Chips:** selecionado laranja com texto tinta; padrão `--surface` com borda `--line2`.
-- **Checkbox:** 16px, laranja com check tinta.
-- **Etapas:** barras 22×4px, laranja = atual.
+- **Chips:** selecionado azul `#0066FF` com texto branco; padrão `--surface` com borda `--line2`.
+- **Checkbox:** 16px, azul com check branco.
+- **Etapas:** barras 22×4px, azul = atual.
 
 ### Selos e tags
-- **Selo de presença:** pílula `--surface`: `[robô laranja] 3 agentes ativos | [ponto verde] 8 online`. `nowrap`.
+- **Selo de presença:** pílula `--surface`: `[robô azul] 3 agentes ativos | [ponto verde] 8 online`. `nowrap`.
 - **Tag de status:** raio 6px, fundo `--bg`, borda `--line2`, ponto colorido (5px), texto 10.5px.
 
 ### Navegação
 - **Sidebar desktop (220px):** logo, itens, card Plus no rodapé. Ativo `--surface` + `--fg`; inativo `--ds-muted`; hover `--ds-hover`.
-- **Barra inferior mobile:** flutuante, raio 22px, 64px; item ativo = quadrado laranja 46px raio 15px.
+- **Barra inferior mobile:** flutuante, raio 22px, 64px; item ativo = quadrado azul 46px raio 15px.
 
 ### Card de sala
 - Estrutura: **número** (01, 02…) · **selo de presença** · **título em 2 linhas** · **ilustração ancorada na base**, cortada pela borda.
-- Fundo Papel `#F4F4F2` ou Laranja `#F0521F`. Alternar na sequência.
+- Fundo Papel `#F4F4F2` ou Azul Escuro/Elétrico `#0066FF`. Alternar na sequência.
 - No dashboard, os cards vazam pela direita; no login, ficam em leque (-6° a 9°).
 
 ### Linha de agente NPC
 `[avatar com inicial] · Nome · Função · Descrição da entrega · Tag de status`
-- Tarefa entregue: avatar com borda laranja + selo de check.
+- Tarefa entregue: avatar com borda azul + selo de check.
 - A descrição diz **o que o agente devolveu** ("Relatório semanal de vendas pronto.").
 - Mobile: descrição abaixo do nome, sem tag.
 
 ### Card de agenda
-`--surface`, raio 12px, título, horário ou "Começa em X min", tag do tipo e avatares sobrepostos (-7px); um pode ser agente (círculo laranja com robô).
+`--surface`, raio 12px, título, horário ou "Começa em X min", tag do tipo e avatares sobrepostos (-7px); um pode ser agente (círculo azul com robô).
 
 ### Bloco de destaque
 Fundo `--hero`: saudação → título → botão primário compacto → cards de sala à direita (abaixo no mobile).
 
 ### Card Plus
-Fundo laranja `#F0521F`, mascote NPC saindo pelo topo, título 23/700 tinta, botão "Fazer upgrade".
+Fundo azul elétrico `#0066FF`, mascote NPC saindo pelo topo, título 23/700 texto branco, botão "Fazer upgrade".
 
 ### Painel de conversa com agente (Drawer)
 - Drawer à direita, 380px, `--surface`, raio 18px nos cantos internos.
-- Cabeçalho: avatar laranja com robô + nome + cargo + tag de status.
-- Mensagens do agente em `--bg` com borda `--line2`; do usuário em laranja com texto tinta.
+- Cabeçalho: avatar azul com robô + nome + cargo + tag de status.
+- Mensagens do agente em `--bg` com borda `--line2`; do usuário em azul `#0066FF` com texto branco.
 - Ação primária: "Criar tarefa para {nome}" (botão primário com ↗).
 - Rodapé: campo de texto 48px, enviar com Enter.
 
@@ -160,7 +165,7 @@ Fundo laranja `#F0521F`, mascote NPC saindo pelo topo, título 23/700 tinta, bot
 ## 7. Ilustrações
 
 - Traço **2px `#141414`**, pontas e junções arredondadas, sem sombra nem gradiente.
-- Sobre Papel `#F4F4F2` ou Laranja `#F0521F`; preenchimento interno com a cor do fundo para esconder linhas de trás.
+- Sobre Papel `#F4F4F2` ou Azul `#0066FF`; preenchimento interno com a cor do fundo para esconder linhas de trás.
 - Sempre **cortada pela borda inferior**. Nunca flutua.
 - `viewBox` com 200 de largura e recorte superior (`0 20 200 130`, `0 10 200 140`).
 - Conjunto: Sala de foco · Agentes de IA · Copa da equipe · Mascote NPC.
@@ -171,7 +176,7 @@ Fundo laranja `#F0521F`, mascote NPC saindo pelo topo, título 23/700 tinta, bot
 
 - Aplicado via `document.documentElement.dataset.theme = 'light' | 'dark'` **e** classe `.dark` (para o shadcn).
 - Persistido em `localStorage['dash-theme']`, compartilhado por todas as telas.
-- Laranja, cards ilustrados, card Plus e botões primários **não mudam** com o tema.
+- Azul, cards ilustrados, card Plus e botões primários mantêm o contraste com o tema.
 
 ---
 
@@ -196,7 +201,11 @@ Fundo laranja `#F0521F`, mascote NPC saindo pelo topo, título 23/700 tinta, bot
 
 ## 11. Não faça
 
-- Nenhuma cor de acento além do laranja `#F0521F`; nenhum gradiente decorativo.
+- **Nenhuma cor de acento de marca além do azul elétrico `#0066FF`. Não usar laranja como cor de destaque.**
+- **Nenhum select nativo sem estilo:** utilizar `CoyDropdown` nos filtros e telas para manter o visual premium com ícones.
+- **Nenhum input de data ou hora nativo sem estilo (`<input type="date">` / `<input type="datetime-local">`):** utilizar sempre o componente oficial `CoyDatePicker` (`src/components/ui/coy-date-picker.tsx`), com popover suspenso flutuante, seleção em azul `#0066FF`, atalhos rápidos ("Hoje", "Amanhã", "+3 dias", "+1 semana") e dias em Português.
+- **Nenhuma seleção de responsável sem minipop estilizado:** a escolha de responsáveis e colaboradores deve ser feita obrigatoriamente através do componente `CoyAssigneePicker` (`src/components/ui/coy-assignee-picker.tsx`), abrindo um minipop flutuante que exibe a foto/avatar circular com iniciais e gradiente, nome completo, cargo/especialidade e setor do usuário, com busca instantânea e suporte a seleção múltipla ou única.
+- **Nenhum seletor de cor nativo cru (`<input type="color">`):** utilizar sempre `CoyColorPicker` (`src/components/ui/coy-color-picker.tsx`) com as cores pré-definidas da marca CoyDash e entrada hexadecimal estilizada.
 - Nenhum emoji na interface do dashboard.
 - Nenhuma ilustração colorida.
 - Nunca dois botões primários na mesma área.

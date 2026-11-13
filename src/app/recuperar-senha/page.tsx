@@ -52,7 +52,7 @@ export default function RecuperarSenhaPage() {
           </label>
 
           <Button
-            className="w-full h-[50px] bg-[var(--color-brand-orange)] hover:bg-[var(--color-brand-orange-hover)] text-[#141414] rounded-full text-[14px] font-semibold flex justify-between items-center px-5 cursor-pointer"
+            className="w-full h-[50px] bg-[var(--color-brand-blue)] hover:bg-[var(--color-brand-blue-hover)] text-white rounded-full text-[14px] font-semibold flex justify-between items-center px-5 cursor-pointer"
             type="submit"
             disabled={isPending}
           >

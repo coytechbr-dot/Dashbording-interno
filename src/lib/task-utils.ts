@@ -39,6 +39,18 @@ export function isTaskAssignedToUser(
       return true
     }
 
+    // Match para atribuições de equipe comercial/geral para gestores/diretores
+    if (str === 'comercial' || str === 'equipe' || str === 'coytech') {
+      if (
+        userEmail?.includes('coytech') ||
+        userEmail?.includes('megaads') ||
+        userName?.includes('coytech') ||
+        userName?.includes('felipe')
+      ) {
+        return true
+      }
+    }
+
     // Match por nome
     if (userName) {
       if (str === userName) return true

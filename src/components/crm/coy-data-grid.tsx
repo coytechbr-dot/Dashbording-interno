@@ -276,7 +276,7 @@ export function CoyDataGrid<T extends { id: string }>({
                   onClick={() => handleSelectView(view.id)}
                   className={`h-[32px] pl-[12px] pr-[8px] rounded-l-full text-[12px] font-semibold flex items-center gap-[6px] transition-colors cursor-pointer ${
                     isActive
-                      ? 'bg-[#f0521f] text-[#141414]'
+                      ? 'bg-[#0066FF] text-[#141414]'
                       : 'bg-[var(--surface)] border border-r-0 border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)]'
                   }`}
                 >
@@ -288,7 +288,7 @@ export function CoyDataGrid<T extends { id: string }>({
                   onClick={() => handleDeleteView(view.id, view.name)}
                   className={`h-[32px] px-[8px] rounded-r-full text-[11px] grid place-items-center transition-colors cursor-pointer border-l-0 ${
                     isActive
-                      ? 'bg-[#f0521f] text-[#141414] hover:bg-[#d84414]'
+                      ? 'bg-[#0066FF] text-[#141414] hover:bg-[#d84414]'
                       : 'bg-[var(--surface)] border border-l-0 border-[var(--line2)] text-[var(--ds-muted)] hover:text-[#ef4444]'
                   }`}
                   title="Remover esta visão salva"
@@ -303,9 +303,9 @@ export function CoyDataGrid<T extends { id: string }>({
           <button
             type="button"
             onClick={() => setSaveViewModalOpen(true)}
-            className="h-[32px] px-[12px] rounded-full border border-dashed border-[var(--line2)] hover:border-[#f0521f] text-[11.5px] font-semibold text-[var(--ds-muted)] hover:text-[var(--fg)] flex items-center gap-[5px] transition-colors cursor-pointer"
+            className="h-[32px] px-[12px] rounded-full border border-dashed border-[var(--line2)] hover:border-[#0066FF] text-[11.5px] font-semibold text-[var(--ds-muted)] hover:text-[var(--fg)] flex items-center gap-[5px] transition-colors cursor-pointer"
           >
-            <Plus className="w-3 h-3 text-[#f0521f]" />
+            <Plus className="w-3 h-3 text-[#0066FF]" />
             <span>Salvar Visão</span>
           </button>
         </div>
@@ -327,7 +327,7 @@ export function CoyDataGrid<T extends { id: string }>({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full h-[36px] pl-[34px] pr-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[12.5px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#f0521f]"
+            className="w-full h-[36px] pl-[34px] pr-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[12.5px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
           />
           {searchQuery && (
             <button
@@ -349,7 +349,7 @@ export function CoyDataGrid<T extends { id: string }>({
               onClick={() => setColumnsDropdownOpen((prev) => !prev)}
               className="h-[36px] px-[12px] rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] hover:border-[var(--line)] text-[12px] font-semibold text-[var(--fg)] flex items-center gap-[6px] transition-colors cursor-pointer"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-[#f0521f]" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#0066FF]" />
               <span>Colunas ({renderedColumns.length}/{columns.length})</span>
               <ChevronDown className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
             </button>
@@ -380,7 +380,7 @@ export function CoyDataGrid<T extends { id: string }>({
                           <span
                             className={`w-[16px] h-[16px] rounded-[4px] border grid place-items-center ${
                               isVisible
-                                ? 'bg-[#f0521f] border-[#f0521f] text-white'
+                                ? 'bg-[#0066FF] border-[#0066FF] text-white'
                                 : 'border-[var(--line2)] bg-[var(--bg)]'
                             }`}
                           >
@@ -437,9 +437,9 @@ export function CoyDataGrid<T extends { id: string }>({
                         <span className="text-[var(--ds-muted)]">
                           {isSorted ? (
                             sortConfig.direction === 'asc' ? (
-                              <ArrowUp className="w-3 h-3 text-[#f0521f]" />
+                              <ArrowUp className="w-3 h-3 text-[#0066FF]" />
                             ) : (
-                              <ArrowDown className="w-3 h-3 text-[#f0521f]" />
+                              <ArrowDown className="w-3 h-3 text-[#0066FF]" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />
@@ -536,7 +536,7 @@ export function CoyDataGrid<T extends { id: string }>({
                   value={newViewName}
                   onChange={(e) => setNewViewName(e.target.value)}
                   placeholder="Ex: Oportunidades Quentes > R$ 3k"
-                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#f0521f]"
+                  className="w-full h-[38px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
                 />
               </div>
 
@@ -545,7 +545,7 @@ export function CoyDataGrid<T extends { id: string }>({
                   type="checkbox"
                   checked={isSharedView}
                   onChange={(e) => setIsSharedView(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#f0521f] focus:ring-0 cursor-pointer"
+                  className="w-4 h-4 rounded text-[#0066FF] focus:ring-0 cursor-pointer"
                 />
                 <div>
                   <span className="text-[12px] font-semibold text-[var(--fg)] block">
@@ -577,7 +577,7 @@ export function CoyDataGrid<T extends { id: string }>({
                 <button
                   type="submit"
                   disabled={isSavingView}
-                  className="h-[36px] px-[18px] rounded-full bg-[#141414] hover:bg-[#f0521f] text-[#F4F4F2] font-semibold text-[12px] transition-colors cursor-pointer disabled:opacity-50"
+                  className="h-[36px] px-[18px] rounded-full bg-[#141414] hover:bg-[#0066FF] text-[#F4F4F2] font-semibold text-[12px] transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {isSavingView ? 'Salvando...' : 'Salvar Visão'}
                 </button>

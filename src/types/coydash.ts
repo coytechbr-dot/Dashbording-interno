@@ -378,18 +378,46 @@ export type CustomFieldType =
 
 export interface CustomFieldDefinition {
   id: string
+  organization_id?: string
   name: string
   type: CustomFieldType
   options?: { label: string; color?: string }[]
   scope: 'task' | 'list' | 'template' | 'client' | 'deal'
   list_id?: string
+  target_task_ids?: string[]
+  description?: string
+  default_value?: string
+  group_id?: string | null
+  order_index?: number
+  cover_image?: string
   is_required?: boolean
+}
+
+export interface CustomFieldGroupFieldTemplate {
+  name: string
+  type: CustomFieldType
+  options?: { label: string; color?: string }[]
+  is_required?: boolean
+  description?: string
+  default_value?: string
+}
+
+export interface CustomFieldGroup {
+  id: string
+  organization_id?: string
+  name: string
+  description: string
+  cover_image: string
+  fields: CustomFieldGroupFieldTemplate[]
+  is_system_template?: boolean
+  created_at?: string
 }
 
 export interface TaskCustomFieldValue {
   field_id: string
   field_name?: string
   field_type?: CustomFieldType
+  options?: { label: string; color?: string }[]
   value: any
 }
 
@@ -431,6 +459,11 @@ export interface TaskItem {
   linked_task_ids?: string[]
   parent_task_id?: string | null
   origin_reference?: string
+  created_by_user_id?: string | null
+  created_by_name?: string
+  is_archived?: boolean
+  archived_at?: string | null
+  archived_by_user_id?: string | null
   created_at: string
 }
 
@@ -522,7 +555,12 @@ export interface OrganizationSettings {
 // ============================================================================
 // GESTÃO DE MEMBROS, COMPARTILHAMENTO DE WORKSPACE E RH PROFISSIONAL
 // ============================================================================
-export type AccessType = 'MEMBER' | 'GUEST'
+export type AccessType =
+  | 'ADMIN'
+  | 'MEMBER'
+  | 'GUEST_MANAGER'
+  | 'GUEST_COLLABORATOR'
+  | 'GUEST'
 export type ContractType = 'PJ' | 'CLT' | 'ESTAGIO' | 'OUTRO'
 export type WorkRegime = 'REMOTO' | 'HIBRIDO' | 'PRESENCIAL'
 export type MemberStatus = 'ACTIVE' | 'INVITED' | 'VACATION' | 'TERMINATED'
@@ -562,6 +600,7 @@ export interface TeamMemberItem {
   allowed_screens: string[]
   allowed_folder_ids: string[]
   allowed_list_ids: string[]
+  custom_permissions?: Record<string, boolean>
   created_at: string
 }
 
@@ -576,6 +615,7 @@ export interface WorkspaceInvitation {
   allowed_screens: string[]
   allowed_folder_ids: string[]
   allowed_list_ids: string[]
+  custom_permissions?: Record<string, boolean>
   token: string
   invited_by?: string | null
   status: 'PENDING' | 'ACCEPTED' | 'EXPIRED'

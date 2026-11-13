@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isCoytechMasterEmail } from '@/lib/access-control'
 import { redirect } from 'next/navigation'
 
 function slugify(text: string) {
@@ -83,6 +84,11 @@ async function ensureUserOrganization(userId: string, email: string, fullName: s
     return existingMember.organization_id
   }
 
+  // Plataforma interna: apenas e-mail oficial Coytech cria organização inicial automaticamente
+  if (!isCoytechMasterEmail(cleanEmail)) {
+    return null
+  }
+
   const orgName = (companyName && companyName.trim()) || `Operação ${fullName.split(' ')[0]}`
   const slug = `${slugify(orgName)}-${Math.random().toString(36).slice(2, 6)}`
   const tier = teamSize === '200+' ? 'ENTERPRISE' : 'MID_MARKET'
@@ -136,7 +142,7 @@ async function ensureUserOrganization(userId: string, email: string, fullName: s
 }
 
 export async function login(prevState: { error?: string } | null, formData: FormData) {
-  const email = (formData.get('email') as string)?.trim()
+  const email = (formData.get('email') as string)?.trim().toLowerCase()
   const password = formData.get('password') as string
 
   if (!email || !password) {
@@ -160,81 +166,30 @@ export async function login(prevState: { error?: string } | null, formData: Form
   const company = data.user.user_metadata?.company as string | undefined
   const teamSize = data.user.user_metadata?.team_size as string | undefined
 
+  let orgId: string | null = null
   try {
-    await ensureUserOrganization(data.user.id, email, fullName, company, teamSize)
+    orgId = await ensureUserOrganization(data.user.id, email, fullName, company, teamSize)
   } catch (err) {
     console.error('Aviso ao verificar organização no login:', err)
+  }
+
+  // Plataforma interna: se não for e-mail Coytech e não estiver vinculado a nenhuma organização como membro, bloqueia
+  if (!orgId && !isCoytechMasterEmail(email)) {
+    await supabase.auth.signOut()
+    return {
+      error:
+        'Acesso restrito: este e-mail não está cadastrado como membro interno. Solicite seu acesso à equipe Coytech.',
+    }
   }
 
   redirect('/')
 }
 
-export async function signup(prevState: { error?: string } | null, formData: FormData) {
-  const name = (formData.get('name') as string)?.trim()
-  const company = (formData.get('company') as string)?.trim()
-  const email = (formData.get('email') as string)?.trim()
-  const password = formData.get('password') as string
-  const teamSize = ((formData.get('team_size') as string) || '6–20').trim()
-
-  if (!name || !email || !password) {
-    return { error: 'Por favor, preencha nome, e-mail e senha.' }
+export async function signup() {
+  return {
+    error:
+      'O auto-cadastro foi desativado. Esta é uma plataforma interna e o acesso é concedido exclusivamente através do app.',
   }
-
-  if (password.length < 6) {
-    return { error: 'A senha precisa ter pelo menos 6 caracteres.' }
-  }
-
-  try {
-    const admin = createAdminClient()
-
-    const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: name,
-        company: company || `Operação ${name.split(' ')[0]}`,
-        team_size: teamSize,
-      },
-    })
-
-    if (createError) {
-      if (
-        createError.message.toLowerCase().includes('already') ||
-        createError.message.toLowerCase().includes('registered')
-      ) {
-        return { error: 'Este e-mail já está cadastrado. Faça login para continuar.' }
-      }
-      return { error: `Não foi possível criar a conta: ${createError.message}` }
-    }
-
-    if (createdUser.user) {
-      await ensureUserOrganization(
-        createdUser.user.id,
-        email,
-        name,
-        company || `Operação ${name.split(' ')[0]}`,
-        teamSize
-      )
-    }
-
-    const supabase = await createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (signInError) {
-      redirect('/login?message=Conta+criada+com+sucesso.+Faca+login+para+entrar.')
-    }
-  } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'digest' in err) {
-      throw err
-    }
-    return { error: 'Erro ao criar conta no servidor. Verifique as credenciais.' }
-  }
-
-  redirect('/')
 }
 
 export async function signOutAction() {

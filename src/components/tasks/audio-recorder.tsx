@@ -108,7 +108,7 @@ export function AudioRecorder({ onRecordingComplete, onClear }: AudioRecorderPro
           onClick={startRecording}
           className="rounded-full bg-[var(--surface)] border-[var(--line2)] text-[var(--ds-muted)] gap-2 hover:bg-[var(--line)]/50 hover:text-[var(--fg)] cursor-pointer h-[32px] px-3 text-[12px]"
         >
-          <Mic className="w-3.5 h-3.5 text-[var(--color-brand-orange)]" />
+          <Mic className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
           Gravar Áudio
         </Button>
       ) : (

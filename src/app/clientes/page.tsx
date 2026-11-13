@@ -30,7 +30,9 @@ import { ProposalGeneratorDialog } from '@/components/commercial/proposal-genera
 import { MethodologyStepper } from '@/components/commercial/methodology-stepper'
 import { ClientContactsTab } from '@/components/clients/client-contacts-tab'
 import { ClientDealsTab } from '@/components/clients/client-deals-tab'
+import { ClientDemandsTab } from '@/components/clients/client-demands-tab'
 import { DealDialog } from '@/components/commercial/deal-dialog'
+import { CoyDatePicker } from '@/components/ui/coy-date-picker'
 import type {
   ClientAccount,
   ClientPriority,
@@ -853,9 +855,9 @@ export default function ClientesPage() {
                       ) : ev.event_type === 'WHATSAPP_LINKED' ? (
                         <MessageSquare className="w-3.5 h-3.5 text-[#2f9e5a]" />
                       ) : ev.event_type === 'STAGE_CHANGE' || ev.event_type === 'DEAL' ? (
-                        <TrendingUp className="w-3.5 h-3.5 text-[#F0521F]" />
+                        <TrendingUp className="w-3.5 h-3.5 text-[#0066FF]" />
                       ) : (
-                        <span className="w-[6px] h-[6px] rounded-full bg-[#F0521F]"></span>
+                        <span className="w-[6px] h-[6px] rounded-full bg-[#0066FF]"></span>
                       )}
                     </div>
                     <div className="flex flex-col gap-[2px] min-w-0">
@@ -1107,77 +1109,9 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {/* ABA: DEMANDAS (VINCULADA AO KANBAN DE TAREFAS) */}
+        {/* ABA: DEMANDAS & ORDENS DE SERVIÇO (VINCULADA AO KANBAN DE TAREFAS) */}
         {activeTab === 'Demandas' && (
-          <div className="bg-[var(--surface)] border border-[var(--line2)] rounded-[16px] p-[22px] flex flex-col gap-[16px]">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-[16px] font-bold">Demandas & Tarefas deste Cliente</h2>
-                <p className="text-[12px] text-[var(--ds-muted)]">
-                  Todas as tarefas criadas aqui aparecem automaticamente no quadro Kanban da equipe.
-                </p>
-              </div>
-            </div>
-
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!newClientTaskTitle.trim()) return
-                await createTask({
-                  title: newClientTaskTitle.trim(),
-                  client_id: activeClient.id,
-                  client_name_snapshot: activeClient.name,
-                  list_id: taskLists[0]?.id || null,
-                  status_key: 'A FAZER',
-                  priority: activeClient.priority,
-                  assignee_name: activeClient.traffic_manager_name || 'Equipe',
-                })
-                setNewClientTaskTitle('')
-              }}
-              className="flex items-center gap-[10px]"
-            >
-              <input
-                value={newClientTaskTitle}
-                onChange={(e) => setNewClientTaskTitle(e.target.value)}
-                placeholder="Nova demanda para este cliente (ex: Subir criativos novos de Meta Ads)..."
-                className="flex-1 h-[44px] px-[14px] rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] focus:border-[#0066FF] text-[13px] text-[var(--fg)] outline-none"
-              />
-              <button
-                type="submit"
-                className="h-[44px] px-[18px] rounded-[10px] bg-[#0066FF] text-white font-semibold text-[13px] cursor-pointer"
-              >
-                + Criar demanda
-              </button>
-            </form>
-
-            {clientTasks.length === 0 ? (
-              <div className="py-[40px] text-center text-[13px] text-[var(--ds-muted)]">
-                Nenhuma demanda vinculada a este cliente ainda.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-[8px]">
-                {clientTasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="bg-[var(--bg)] border border-[var(--line2)] rounded-[12px] p-[14px] flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-[10px]">
-                      <CheckSquare className="w-4 h-4 text-[#0066FF]" />
-                      <div>
-                        <div className="text-[13.5px] font-semibold">{t.title}</div>
-                        <div className="text-[11.5px] text-[var(--ds-muted)]">
-                          Responsável: {t.assignee_name || 'Time'} · Criada em {t.created_at}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="px-[10px] py-[4px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[11px] font-semibold">
-                      {t.status_key}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ClientDemandsTab client={activeClient} />
         )}
 
         {/* ABA: AGENDA */}
@@ -1216,11 +1150,11 @@ export default function ClientesPage() {
                 placeholder="Título do compromisso (ex: Call de Alinhamento Mensal / QBR)..."
                 className="flex-1 min-w-[240px] h-[42px] px-[14px] rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none"
               />
-              <input
-                type="date"
+              <CoyDatePicker
                 value={newAgendaDate}
-                onChange={(e) => setNewAgendaDate(e.target.value)}
-                className="h-[42px] px-[12px] rounded-[10px] bg-[var(--bg)] border border-[var(--line2)] text-[13px] text-[var(--fg)] outline-none"
+                onChange={setNewAgendaDate}
+                placeholder="Data do compromisso..."
+                className="h-[42px] min-w-[200px]"
               />
               <button
                 type="submit"

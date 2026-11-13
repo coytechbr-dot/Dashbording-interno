@@ -1,8 +1,8 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type {
   Organization,
   PersonaProfile,
@@ -35,6 +35,7 @@ import type {
   TaskStatusColumn,
   TaskItem,
   CustomFieldDefinition,
+  CustomFieldGroup,
   TaskCustomFieldValue,
   TaskPriorityLevel,
   TaskSubtaskItem,
@@ -64,6 +65,36 @@ import type {
   TimelineEventType,
   SavedViewScope,
 } from '@/types/coydash'
+
+const mapRawCustomFieldDef = (d: Record<string, unknown>): CustomFieldDefinition => ({
+  id: String(d.id),
+  organization_id: d.organization_id ? String(d.organization_id) : undefined,
+  list_id: d.list_id ? String(d.list_id) : undefined,
+  name: String(d.name || ''),
+  type: (d.type as CustomFieldDefinition['type']) || 'text',
+  options: Array.isArray(d.options) ? (d.options as { label: string; color?: string }[]) : [],
+  scope: (d.scope as CustomFieldDefinition['scope']) || 'list',
+  target_task_ids: Array.isArray(d.target_task_ids)
+    ? d.target_task_ids.map((id) => String(id))
+    : [],
+  description: d.description ? String(d.description) : undefined,
+  default_value: d.default_value ? String(d.default_value) : undefined,
+  group_id: d.group_id ? String(d.group_id) : null,
+  order_index: Number(d.order_index ?? 0),
+  cover_image: d.cover_image ? String(d.cover_image) : undefined,
+  is_required: Boolean(d.is_required),
+})
+
+const mapRawCustomFieldGroup = (g: Record<string, unknown>): CustomFieldGroup => ({
+  id: String(g.id),
+  organization_id: g.organization_id ? String(g.organization_id) : undefined,
+  name: String(g.name || 'Grupo de Campos'),
+  description: String(g.description || ''),
+  cover_image: String(g.cover_image || '/images/tpl-traffic.jpg'),
+  fields: Array.isArray(g.fields) ? (g.fields as CustomFieldGroup['fields']) : [],
+  is_system_template: Boolean(g.is_system_template),
+  created_at: g.created_at ? String(g.created_at) : undefined,
+})
 
 const BASE_AGENTS: CoytechAgentSpec[] = [
   {
@@ -294,7 +325,7 @@ const DEFAULT_PIPELINE_STAGES_SPEC = [
   { name: 'Novo Lead / Diagnóstico', probability_percent: 10, color: '#38bdf8', is_won: false, is_lost: false, stage_order: 0 },
   { name: 'Qualificação & BIA', probability_percent: 25, color: '#e8c14a', is_won: false, is_lost: false, stage_order: 1 },
   { name: 'Reunião de Apresentação', probability_percent: 50, color: '#8f7dff', is_won: false, is_lost: false, stage_order: 2 },
-  { name: 'Proposta Enviada', probability_percent: 75, color: '#f0521f', is_won: false, is_lost: false, stage_order: 3 },
+  { name: 'Proposta Enviada', probability_percent: 75, color: '#0066FF', is_won: false, is_lost: false, stage_order: 3 },
   { name: 'Contrato Fechado', probability_percent: 100, color: '#2f9e5a', is_won: true, is_lost: false, stage_order: 4 },
   { name: 'Perdido / Desqualificado', probability_percent: 0, color: '#ef4444', is_won: false, is_lost: true, stage_order: 5 },
 ]
@@ -304,7 +335,7 @@ export const DEFAULT_INITIAL_PIPELINE: PipelineItem = {
   organization_id: 'org-default',
   name: '🚀 Novos Clientes Coytech',
   is_default: true,
-  color: '#F0521F',
+  color: '#0066FF',
   created_at: new Date().toISOString(),
 }
 
@@ -462,7 +493,7 @@ interface CoyDashContextValue {
   taskLists: TaskListItem[]
   taskStatuses: TaskStatusColumn[]
   tasks: TaskItem[]
-  createTaskFolder: (name: string, icon?: string) => Promise<void>
+  createTaskFolder: (name: string, icon?: string) => Promise<string | null>
   updateTaskFolder: (folderId: string, name: string, icon: string) => Promise<void>
   deleteTaskFolder: (folderId: string) => Promise<void>
   createTaskList: (folderId: string, name: string, icon?: string) => Promise<string | null>
@@ -474,13 +505,26 @@ interface CoyDashContextValue {
     updates: { name?: string; color?: string; order_index?: number }
   ) => Promise<void>
   deleteTaskStatusColumn: (statusId: string) => Promise<void>
-  createTask: (input: Partial<TaskItem>) => Promise<void>
+  createTask: (input: Partial<TaskItem>) => Promise<TaskItem | null>
   updateTask: (taskId: string, updates: Partial<TaskItem>) => Promise<void>
+  archiveTask: (taskId: string, archived: boolean) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   addTaskComment: (taskId: string, comment: TaskCommentItem) => Promise<void>
   customFieldDefs: CustomFieldDefinition[]
-  createCustomFieldDef: (def: Partial<CustomFieldDefinition>) => Promise<void>
-  deleteCustomFieldDef: (defId: string) => Promise<void>
+  createCustomFieldDef: (def: Partial<CustomFieldDefinition>) => Promise<CustomFieldDefinition | null>
+  updateCustomFieldDef: (defId: string, updates: Partial<CustomFieldDefinition>) => Promise<CustomFieldDefinition | null>
+  deleteCustomFieldDef: (defId: string, fieldName?: string) => Promise<void>
+  customFieldGroups: CustomFieldGroup[]
+  createCustomFieldGroup: (group: Partial<CustomFieldGroup>) => Promise<CustomFieldGroup | null>
+  updateCustomFieldGroup: (groupId: string, updates: Partial<CustomFieldGroup>) => Promise<CustomFieldGroup | null>
+  deleteCustomFieldGroup: (groupId: string) => Promise<void>
+  applyCustomFieldGroup: (params: {
+    groupId?: string
+    fields?: CustomFieldGroup['fields']
+    scope: CustomFieldDefinition['scope']
+    listId?: string
+    targetTaskIds?: string[]
+  }) => Promise<CustomFieldDefinition[]>
 
   whatsappConversations: WhatsappConversation[]
   createWhatsappConv: (input: {
@@ -525,10 +569,12 @@ interface CoyDashContextValue {
     allowed_screens: string[]
     allowed_folder_ids: string[]
     allowed_list_ids: string[]
+    custom_permissions?: Record<string, boolean>
   } | null
   inviteTeamMember: (input: {
     full_name: string
     email: string
+    password?: string
     whatsapp_phone?: string
     whatsapp?: string
     role?: string
@@ -547,9 +593,11 @@ interface CoyDashContextValue {
     allowed_screens?: string[]
     allowed_folder_ids?: string[]
     allowed_list_ids?: string[]
+    custom_permissions?: Record<string, boolean>
   }) => Promise<{
     ok: boolean
     emailSent?: boolean
+    passwordSet?: boolean
     alreadyRegistered?: boolean
     inviteLink?: string
     directLoginUrl?: string
@@ -557,6 +605,11 @@ interface CoyDashContextValue {
     error?: string
   }>
   updateTeamMember: (memberId: string, updates: Partial<TeamMemberItem>) => Promise<void>
+  adminUpdateMemberCredentials: (
+    memberId: string,
+    newEmail?: string,
+    newPassword?: string
+  ) => Promise<{ ok: boolean; error?: string; email?: string; passwordUpdated?: boolean }>
   deleteTeamMember: (memberId: string) => Promise<void>
   createHrNote: (memberId: string, content: string, category?: string) => Promise<void>
   deleteHrNote: (noteId: string) => Promise<void>
@@ -695,6 +748,11 @@ function mapRawTask(t: Record<string, unknown>): TaskItem {
     linked_task_ids: Array.isArray(t.linked_task_ids) ? (t.linked_task_ids as string[]) : [],
     parent_task_id: t.parent_task_id ? String(t.parent_task_id) : null,
     origin_reference: t.origin_reference ? String(t.origin_reference) : '',
+    created_by_user_id: t.created_by_user_id ? String(t.created_by_user_id) : null,
+    created_by_name: t.created_by_name ? String(t.created_by_name) : '',
+    is_archived: Boolean(t.is_archived),
+    archived_at: t.archived_at ? String(t.archived_at) : null,
+    archived_by_user_id: t.archived_by_user_id ? String(t.archived_by_user_id) : null,
     created_at: formatTimeOrDate(t.created_at as string),
   }
 }
@@ -736,6 +794,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
   const [taskStatuses, setTaskStatuses] = useState<TaskStatusColumn[]>([])
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([])
+  const [customFieldGroups, setCustomFieldGroups] = useState<CustomFieldGroup[]>([])
 
   const [whatsappConversations, setWhatsappConversations] = useState<WhatsappConversation[]>([])
   const [paidCampaigns, setPaidCampaigns] = useState<PaidTrafficCampaign[]>([])
@@ -752,6 +811,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     allowed_screens: string[]
     allowed_folder_ids: string[]
     allowed_list_ids: string[]
+    custom_permissions?: Record<string, boolean>
   } | null>(null)
 
   // CoyCRM: Pipelines, Estágios, Oportunidades (Deals), Contatos 1:N, Timeline e Visões Salvas
@@ -798,9 +858,9 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     email: authenticatedUser?.email || basePersona.email,
   }
 
-  const refreshFromDatabase = useCallback(async (orgIdOverride?: string) => {
+  const refreshFromDatabase = useCallback(async (orgIdOverride?: string, silent?: boolean) => {
     try {
-      setIsLoading(true)
+      if (!silent) setIsLoading(true)
       const targetOrg = orgIdOverride || currentOrgId
       const url = targetOrg
         ? `/api/coydash/sync?orgId=${encodeURIComponent(targetOrg)}`
@@ -1245,16 +1305,12 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
 
       if (Array.isArray(data.customFieldDefs)) {
         setCustomFieldDefs(
-          data.customFieldDefs.map((d: Record<string, unknown>) => ({
-            id: String(d.id),
-            organization_id: String(d.organization_id),
-            list_id: d.list_id ? String(d.list_id) : undefined,
-            name: String(d.name || ''),
-            type: d.type as any,
-            options: Array.isArray(d.options) ? (d.options as any) : [],
-            scope: (d.scope as any) || 'list',
-            is_required: Boolean(d.is_required),
-          }))
+          data.customFieldDefs.map((d: Record<string, unknown>) => mapRawCustomFieldDef(d))
+        )
+      }
+      if (Array.isArray(data.customFieldGroups)) {
+        setCustomFieldGroups(
+          data.customFieldGroups.map((g: Record<string, unknown>) => mapRawCustomFieldGroup(g))
         )
       }
 
@@ -1380,6 +1436,10 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
           allowed_screens: Array.isArray(mb.allowed_screens) ? (mb.allowed_screens as string[]) : [],
           allowed_folder_ids: Array.isArray(mb.allowed_folder_ids) ? (mb.allowed_folder_ids as string[]) : [],
           allowed_list_ids: Array.isArray(mb.allowed_list_ids) ? (mb.allowed_list_ids as string[]) : [],
+          custom_permissions:
+            mb.custom_permissions && typeof mb.custom_permissions === 'object'
+              ? (mb.custom_permissions as Record<string, boolean>)
+              : {},
           created_at: formatTimeOrDate(mb.created_at as string),
         }))
       )
@@ -1441,6 +1501,67 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     }
     refreshFromDatabase()
   }, [pathname, refreshFromDatabase])
+
+  // Sincronização em tempo real (Supabase Realtime) entre todos os responsáveis/membros
+  const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const authPages = ['/login', '/cadastro', '/recuperar-senha', '/atualizar-senha']
+    if (authPages.some((p) => pathname.startsWith(p))) return
+    if (!currentOrgId || !authenticatedUser) return
+
+    let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null
+    try {
+      supabase = createSupabaseBrowserClient()
+    } catch {
+      return
+    }
+
+    const scheduleSilentRefresh = () => {
+      if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current)
+      realtimeTimerRef.current = setTimeout(() => {
+        refreshFromDatabase(currentOrgId, true)
+      }, 350)
+    }
+
+    const channel = supabase
+      .channel(`coydash-tasks-fields-${currentOrgId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `organization_id=eq.${currentOrgId}`,
+        },
+        scheduleSilentRefresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'custom_field_definitions',
+          filter: `organization_id=eq.${currentOrgId}`,
+        },
+        scheduleSilentRefresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'custom_field_groups',
+          filter: `organization_id=eq.${currentOrgId}`,
+        },
+        scheduleSilentRefresh
+      )
+      .subscribe()
+
+    return () => {
+      if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current)
+      supabase?.removeChannel(channel)
+    }
+  }, [currentOrgId, authenticatedUser, pathname, refreshFromDatabase])
 
   const setCurrentOrgId = (id: string) => {
     setCurrentOrgIdState(id)
@@ -1745,13 +1866,13 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
   // =========================================================================
   // ACTIONS: TAREFAS, SETORES E PROJETOS (ROOMIE OFFICE AI)
   // =========================================================================
-  const createTaskFolder = async (name: string, icon = 'Folder') => {
+  const createTaskFolder = async (name: string, icon = 'Folder'): Promise<string | null> => {
     try {
       const res = await postAction('CREATE_TASK_FOLDER', { name, icon })
       const folderId = res?.data?.id || res?.folder?.id
       if (folderId) {
         await refreshFromDatabase(currentOrg.id)
-        return
+        return String(folderId)
       }
       // Fallback local caso servidor/DB não responda
       const localFolder: TaskFolderItem = {
@@ -1762,6 +1883,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       }
       setTaskFolders((prev) => [...prev, localFolder])
+      return localFolder.id
     } catch {
       const localFolder: TaskFolderItem = {
         id: `folder_${Date.now()}`,
@@ -1771,6 +1893,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       }
       setTaskFolders((prev) => [...prev, localFolder])
+      return localFolder.id
     }
   }
 
@@ -1870,22 +1993,55 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     await postAction('DELETE_TASK_STATUS_COLUMN', { statusId })
   }
 
-  const createTask = async (input: Partial<TaskItem>) => {
-    await postAction('CREATE_TASK', input as Record<string, unknown>)
+  const createTask = async (input: Partial<TaskItem>): Promise<TaskItem | null> => {
+    const res = await postAction('CREATE_TASK', input as Record<string, unknown>)
+    if (res?.ok && res?.data) {
+      const created = mapRawTask(res.data as Record<string, unknown>)
+      setTasks((prev) => [created, ...prev])
+      return created
+    }
     await refreshFromDatabase(currentOrg.id)
+    return null
   }
 
   const updateTask = async (taskId: string, updates: Partial<TaskItem>) => {
+    const syncedUpdates: Partial<TaskItem> = { ...updates }
+    if (Array.isArray(syncedUpdates.assignees) && syncedUpdates.assignee_name === undefined) {
+      syncedUpdates.assignee_name = syncedUpdates.assignees.join(', ')
+    }
+
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, ...syncedUpdates } : t))
     )
-    await postAction('UPDATE_TASK', { taskId, updates })
-    await refreshFromDatabase(currentOrg.id)
+    const res = await postAction('UPDATE_TASK', { taskId, updates: syncedUpdates })
+    if (res?.ok && res?.data) {
+      const updatedTask = mapRawTask(res.data as Record<string, unknown>)
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? updatedTask : t))
+      )
+    } else if (res && res.ok === false) {
+      await refreshFromDatabase(currentOrg.id)
+      throw new Error(res.error || 'Falha ao atualizar tarefa')
+    }
+  }
+
+  const archiveTask = async (taskId: string, archived: boolean) => {
+    const res = await postAction('ARCHIVE_TASK', { taskId, archived })
+    if (res && res.ok === false) {
+      throw new Error(res.error || 'Sem permissão para arquivar esta tarefa.')
+    }
+    if (res?.ok && res?.data) {
+      const updated = mapRawTask(res.data as Record<string, unknown>)
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)))
+    }
   }
 
   const deleteTask = async (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
-    await postAction('DELETE_TASK', { taskId })
+    const res = await postAction('DELETE_TASK', { taskId })
+    if (res && res.ok === false) {
+      throw new Error(res.error || 'Sem permissão para excluir tarefa.')
+    }
+    setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parent_task_id !== taskId))
   }
 
   const addTaskComment = async (taskId: string, comment: TaskCommentItem) => {
@@ -1901,14 +2057,144 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     await postAction('ADD_TASK_COMMENT', { taskId, comment: comment as unknown as Record<string, unknown> })
   }
 
-  const createCustomFieldDef = async (def: Partial<CustomFieldDefinition>) => {
-    await postAction('CREATE_CUSTOM_FIELD_DEF', def as Record<string, unknown>)
-    await refreshFromDatabase(currentOrg.id)
+  const createCustomFieldDef = async (
+    def: Partial<CustomFieldDefinition>
+  ): Promise<CustomFieldDefinition | null> => {
+    const res = await postAction('CREATE_CUSTOM_FIELD_DEF', def as Record<string, unknown>)
+    if (res?.ok && res?.data) {
+      const created = mapRawCustomFieldDef(res.data as Record<string, unknown>)
+      setCustomFieldDefs((prev) => [...prev, created])
+      return created
+    }
+    await refreshFromDatabase(currentOrg.id, true)
+    return null
   }
 
-  const deleteCustomFieldDef = async (defId: string) => {
+  const updateCustomFieldDef = async (
+    defId: string,
+    updates: Partial<CustomFieldDefinition>
+  ): Promise<CustomFieldDefinition | null> => {
+    setCustomFieldDefs((prev) =>
+      prev.map((d) => {
+        if (d.id !== defId) return d
+        const nextScope = updates.scope ?? d.scope
+        return {
+          ...d,
+          ...updates,
+          list_id: nextScope === 'list' ? (updates.list_id ?? d.list_id) : undefined,
+          target_task_ids:
+            nextScope === 'task' ? (updates.target_task_ids ?? d.target_task_ids ?? []) : [],
+        }
+      })
+    )
+    const res = await postAction('UPDATE_CUSTOM_FIELD_DEF', {
+      defId,
+      updates: updates as Record<string, unknown>,
+    })
+    if (res?.ok && res?.data) {
+      const updated = mapRawCustomFieldDef(res.data as Record<string, unknown>)
+      setCustomFieldDefs((prev) => prev.map((d) => (d.id === defId ? updated : d)))
+      return updated
+    }
+    await refreshFromDatabase(currentOrg.id, true)
+    return null
+  }
+
+  const deleteCustomFieldDef = async (defId: string, fieldName?: string) => {
+    const targetDef = customFieldDefs.find((d) => d.id === defId)
+    const targetName = fieldName || targetDef?.name
+
     setCustomFieldDefs((prev) => prev.filter((d) => d.id !== defId))
-    await postAction('DELETE_CUSTOM_FIELD_DEF', { defId })
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (!Array.isArray(t.custom_fields) || t.custom_fields.length === 0) return t
+        return {
+          ...t,
+          custom_fields: t.custom_fields.filter((cf) => {
+            const matchId = cf.field_id === defId
+            const matchName =
+              targetName &&
+              cf.field_name &&
+              cf.field_name.toLowerCase() === targetName.toLowerCase()
+            return !matchId && !matchName
+          }),
+        }
+      })
+    )
+
+    const res = await postAction('DELETE_CUSTOM_FIELD_DEF', { defId, fieldName: targetName })
+    if (res && res.ok === false) {
+      await refreshFromDatabase(currentOrg.id, true)
+    }
+  }
+
+  const createCustomFieldGroup = async (
+    group: Partial<CustomFieldGroup>
+  ): Promise<CustomFieldGroup | null> => {
+    const res = await postAction('CREATE_CUSTOM_FIELD_GROUP', group as Record<string, unknown>)
+    if (res?.ok && res?.data) {
+      const created = mapRawCustomFieldGroup(res.data as Record<string, unknown>)
+      setCustomFieldGroups((prev) => [...prev, created])
+      return created
+    }
+    await refreshFromDatabase(currentOrg.id, true)
+    return null
+  }
+
+  const updateCustomFieldGroup = async (
+    groupId: string,
+    updates: Partial<CustomFieldGroup>
+  ): Promise<CustomFieldGroup | null> => {
+    setCustomFieldGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, ...updates } : g))
+    )
+    const res = await postAction('UPDATE_CUSTOM_FIELD_GROUP', {
+      groupId,
+      updates: updates as Record<string, unknown>,
+    })
+    if (res?.ok && res?.data) {
+      const updated = mapRawCustomFieldGroup(res.data as Record<string, unknown>)
+      setCustomFieldGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)))
+      return updated
+    }
+    await refreshFromDatabase(currentOrg.id, true)
+    return null
+  }
+
+  const deleteCustomFieldGroup = async (groupId: string) => {
+    setCustomFieldGroups((prev) => prev.filter((g) => g.id !== groupId))
+    const res = await postAction('DELETE_CUSTOM_FIELD_GROUP', { groupId })
+    if (res && res.ok === false) {
+      await refreshFromDatabase(currentOrg.id, true)
+    }
+  }
+
+  const applyCustomFieldGroup = async (params: {
+    groupId?: string
+    fields?: CustomFieldGroup['fields']
+    scope: CustomFieldDefinition['scope']
+    listId?: string
+    targetTaskIds?: string[]
+  }): Promise<CustomFieldDefinition[]> => {
+    const targetGroup = params.groupId
+      ? customFieldGroups.find((g) => g.id === params.groupId)
+      : undefined
+    const fieldsToApply = params.fields || targetGroup?.fields || []
+    const res = await postAction('APPLY_CUSTOM_FIELD_GROUP', {
+      groupId: params.groupId,
+      fields: fieldsToApply,
+      scope: params.scope,
+      list_id: params.listId,
+      target_task_ids: params.targetTaskIds,
+      cover_image: targetGroup?.cover_image || '/images/tpl-traffic.jpg',
+    })
+    if (res?.ok && Array.isArray(res?.data)) {
+      const createdDefs = (res.data as Record<string, unknown>[]).map(mapRawCustomFieldDef)
+      setCustomFieldDefs((prev) => [...prev, ...createdDefs])
+      return createdDefs
+    }
+    await refreshFromDatabase(currentOrg.id, true)
+    return []
   }
 
   // =========================================================================
@@ -2137,6 +2423,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
   const inviteTeamMember = async (input: {
     full_name: string
     email: string
+    password?: string
     whatsapp_phone?: string
     whatsapp?: string
     role?: string
@@ -2161,6 +2448,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     return res as {
       ok: boolean
       emailSent?: boolean
+      passwordSet?: boolean
       alreadyRegistered?: boolean
       inviteLink?: string
       directLoginUrl?: string
@@ -2175,6 +2463,22 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     )
     await postAction('UPDATE_TEAM_MEMBER', { memberId, updates })
     await refreshFromDatabase(currentOrg.id)
+  }
+
+  const adminUpdateMemberCredentials = async (
+    memberId: string,
+    newEmail?: string,
+    newPassword?: string
+  ) => {
+    const res = await postAction('ADMIN_UPDATE_MEMBER_CREDENTIALS', {
+      memberId,
+      newEmail,
+      newPassword,
+    })
+    if (res.ok) {
+      await refreshFromDatabase(currentOrg.id)
+    }
+    return res as { ok: boolean; error?: string; email?: string; passwordUpdated?: boolean }
   }
 
   const deleteTeamMember = async (memberId: string) => {
@@ -2200,7 +2504,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
 
   const createPipeline = async (
     name: string,
-    color: string = '#F0521F',
+    color: string = '#0066FF',
     stages?: Partial<PipelineStageItem>[]
   ): Promise<PipelineItem | null> => {
     const defaultStages = stages || DEFAULT_PIPELINE_STAGES_SPEC
@@ -2457,11 +2761,18 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
         deleteTaskStatusColumn,
         createTask,
         updateTask,
+        archiveTask,
         deleteTask,
         addTaskComment,
         customFieldDefs,
         createCustomFieldDef,
+        updateCustomFieldDef,
         deleteCustomFieldDef,
+        customFieldGroups,
+        createCustomFieldGroup,
+        updateCustomFieldGroup,
+        deleteCustomFieldGroup,
+        applyCustomFieldGroup,
         whatsappConversations,
         createWhatsappConv,
         sendOperatorWhatsappMessage,
@@ -2488,6 +2799,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
         currentUserPermissions,
         inviteTeamMember,
         updateTeamMember,
+        adminUpdateMemberCredentials,
         deleteTeamMember,
         createHrNote,
         deleteHrNote,

@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { useCoyDash } from '@/lib/coydash-store'
 import { signOutAction } from '@/app/actions/auth'
+import { hasFeaturePermission, isGuestScopedLevel } from '@/lib/access-control'
 import {
   IllustrationNpcMascot,
   IconRobot16,
@@ -137,7 +138,17 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
     currentUserPermissions,
   } = useCoyDash()
 
-  const isGuest = currentUserPermissions?.access_type === 'GUEST'
+  const isGuest = isGuestScopedLevel(currentUserPermissions?.access_type)
+  const canManageStructure = hasFeaturePermission(
+    {
+      userId: authenticatedUser?.id,
+      email: authenticatedUser?.email,
+      role: currentUserPermissions?.role || authenticatedUser?.role,
+      access_type: currentUserPermissions?.access_type,
+      custom_permissions: currentUserPermissions?.custom_permissions,
+    },
+    'tasks.manage_structure'
+  )
   const allowedScreens = currentUserPermissions?.allowed_screens || []
 
   const canAccessScreen = (screenKey?: string) => {
@@ -603,7 +614,7 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                   {sidebarCollapsed && (
                     <>
                       {path === '/comercial' && deals.length > 0 && (
-                        <span className="absolute top-[5px] right-[5px] w-[6px] h-[6px] rounded-full bg-[#F0521F]" />
+                        <span className="absolute top-[5px] right-[5px] w-[6px] h-[6px] rounded-full bg-[#0066FF]" />
                       )}
                       {path === '/atendimento' && humanHandoffCount > 0 && (
                         <span className="absolute top-[5px] right-[5px] w-[7px] h-[7px] rounded-full bg-[#0066FF]" />
@@ -626,21 +637,23 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
               <span className="text-[10.5px] font-semibold tracking-[0.06em] uppercase text-[var(--ds-muted)]">
                 Setores & Projetos
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setFolderModal({
-                    open: true,
-                    mode: 'create',
-                    name: '',
-                    icon: 'Folder',
-                  })
-                }
-                title="Criar novo setor"
-                className="w-[22px] h-[22px] rounded-[6px] bg-[var(--surface)] hover:bg-[#0066FF] hover:text-white grid place-items-center text-[var(--ds-muted)] transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-              </button>
+              {canManageStructure && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFolderModal({
+                      open: true,
+                      mode: 'create',
+                      name: '',
+                      icon: 'Folder',
+                    })
+                  }
+                  title="Criar novo setor"
+                  className="w-[22px] h-[22px] rounded-[6px] bg-[var(--surface)] hover:bg-[#0066FF] hover:text-white grid place-items-center text-[var(--ds-muted)] transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
             </div>
 
             {visibleTaskFolders.length === 0 ? (
@@ -678,53 +691,8 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                           <span className="truncate font-medium">{folder.name}</span>
                         </button>
 
-                        <div className="flex items-center gap-[2px] opacity-80 group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setListModal({
-                                open: true,
-                                mode: 'create',
-                                folderId: folder.id,
-                                name: '',
-                                icon: 'List',
-                              })
-                            }
-                            title="Criar projeto/lista neste setor"
-                            className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFolderModal({
-                                open: true,
-                                mode: 'edit',
-                                folderId: folder.id,
-                                name: folder.name,
-                                icon: folder.icon,
-                              })
-                            }
-                            title="Editar setor"
-                            className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
-                          >
-                            <Pencil className="w-2.5 h-2.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteTaskFolder(folder.id)}
-                            title="Excluir setor"
-                            className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
-                          >
-                            <Trash2 className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {isOpen && (
-                        <div className="pl-[20px] flex flex-col gap-[2px]">
-                          {folderLists.length === 0 ? (
+                        {canManageStructure && (
+                          <div className="flex items-center gap-[2px] opacity-80 group-hover:opacity-100">
                             <button
                               type="button"
                               onClick={() =>
@@ -736,16 +704,67 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                   icon: 'List',
                                 })
                               }
-                              className="text-left px-[8px] py-[4px] text-[11px] text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                              title="Criar projeto/lista neste setor"
+                              className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
                             >
-                              + Criar primeira lista
+                              <Plus className="w-3 h-3" />
                             </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFolderModal({
+                                  open: true,
+                                  mode: 'edit',
+                                  folderId: folder.id,
+                                  name: folder.name,
+                                  icon: folder.icon,
+                                })
+                              }
+                              title="Editar setor"
+                              className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteTaskFolder(folder.id)}
+                              title="Excluir setor"
+                              className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isOpen && (
+                        <div className="pl-[20px] flex flex-col gap-[2px]">
+                          {folderLists.length === 0 ? (
+                            canManageStructure ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setListModal({
+                                    open: true,
+                                    mode: 'create',
+                                    folderId: folder.id,
+                                    name: '',
+                                    icon: 'List',
+                                  })
+                                }
+                                className="text-left px-[8px] py-[4px] text-[11px] text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                              >
+                                + Criar primeira lista
+                              </button>
+                            ) : null
                           ) : (
                             folderLists.map((list) => {
                               const ListIcon = ICON_MAP[list.icon] || List
                               const listPath = `/listas/${list.id}`
                               const listActive = pathname === listPath
-                              const countInList = tasks.filter((t) => t.list_id === list.id).length
+                              const countInList = tasks.filter(
+                                (t) => t.list_id === list.id && !t.is_archived
+                              ).length
 
                               return (
                                 <div
@@ -769,31 +788,35 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                         {countInList}
                                       </span>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setListModal({
-                                          open: true,
-                                          mode: 'edit',
-                                          folderId: folder.id,
-                                          listId: list.id,
-                                          name: list.name,
-                                          icon: list.icon,
-                                        })
-                                      }
-                                      className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
-                                      title="Renomear lista"
-                                    >
-                                      <Pencil className="w-2.5 h-2.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteTaskList(list.id)}
-                                      className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
-                                      title="Excluir lista"
-                                    >
-                                      <Trash2 className="w-2.5 h-2.5" />
-                                    </button>
+                                    {canManageStructure && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setListModal({
+                                              open: true,
+                                              mode: 'edit',
+                                              folderId: folder.id,
+                                              listId: list.id,
+                                              name: list.name,
+                                              icon: list.icon,
+                                            })
+                                          }
+                                          className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+                                          title="Renomear lista"
+                                        >
+                                          <Pencil className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteTaskList(list.id)}
+                                          className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                                          title="Excluir lista"
+                                        >
+                                          <Trash2 className="w-2.5 h-2.5" />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               )

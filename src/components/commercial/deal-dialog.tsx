@@ -16,6 +16,8 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useCoyDash, DEFAULT_INITIAL_PIPELINE, DEFAULT_INITIAL_STAGES } from '@/lib/coydash-store'
+import { CoyDatePicker } from '@/components/ui/coy-date-picker'
+import { CoyAssigneePicker } from '@/components/ui/coy-assignee-picker'
 import type { DealItem, PipelineItem, PipelineStageItem, DealPriority } from '@/types/coydash'
 
 interface DealDialogProps {
@@ -29,7 +31,7 @@ interface DealDialogProps {
 const PRIORITY_OPTIONS: { id: DealPriority; label: string; dot: string }[] = [
   { id: 'low', label: 'Baixa', dot: 'bg-[#2f9e5a]' },
   { id: 'medium', label: 'Média', dot: 'bg-[#38bdf8]' },
-  { id: 'high', label: 'Alta', dot: 'bg-[#f0521f]' },
+  { id: 'high', label: 'Alta', dot: 'bg-[#0066FF]' },
   { id: 'urgent', label: 'Urgente', dot: 'bg-[#ef4444]' },
 ]
 
@@ -201,7 +203,7 @@ export function DealDialog({
         {/* Cabeçalho */}
         <div className="p-[20px] border-b border-[var(--line2)] flex items-center justify-between shrink-0 bg-[var(--surface)]">
           <div className="flex items-center gap-[10px]">
-            <div className="w-[38px] h-[38px] rounded-full bg-[#f0521f]/10 border border-[#f0521f]/30 flex items-center justify-center text-[#f0521f]">
+            <div className="w-[38px] h-[38px] rounded-full bg-[#0066FF]/10 border border-[#0066FF]/30 flex items-center justify-center text-[#0066FF]">
               <Briefcase className="w-4 h-4" />
             </div>
             <div>
@@ -242,7 +244,7 @@ export function DealDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Projeto CRM + Tráfego Pago MetalSul"
-              className="w-full h-[40px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#f0521f]"
+              className="w-full h-[40px] px-[12px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] focus:outline-none focus:border-[#0066FF]"
             />
           </div>
 
@@ -255,7 +257,7 @@ export function DealDialog({
               <select
                 value={pipelineId}
                 onChange={(e) => handlePipelineChange(e.target.value)}
-                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#f0521f]"
+                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
               >
                 {safePipelines.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -272,7 +274,7 @@ export function DealDialog({
               <select
                 value={stageId}
                 onChange={(e) => setStageId(e.target.value)}
-                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#f0521f]"
+                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
               >
                 {availableStages.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -299,14 +301,14 @@ export function DealDialog({
                   value={valueMrr}
                   onChange={(e) => setValueMrr(Number(e.target.value))}
                   placeholder="0,00"
-                  className="w-full h-[38px] pl-[34px] pr-[10px] bg-[var(--surface)] border border-[var(--line2)] rounded-[8px] text-[var(--fg)] font-semibold text-[13px] focus:outline-none focus:border-[#f0521f]"
+                  className="w-full h-[38px] pl-[34px] pr-[10px] bg-[var(--surface)] border border-[var(--line2)] rounded-[8px] text-[var(--fg)] font-semibold text-[13px] focus:outline-none focus:border-[#0066FF]"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-[11.5px] font-semibold text-[var(--fg)] mb-[4px] flex items-center gap-[5px]">
-                <TrendingUp className="w-3.5 h-3.5 text-[#f0521f]" />
+                <TrendingUp className="w-3.5 h-3.5 text-[#0066FF]" />
                 Taxa de Implementação (Setup)
               </label>
               <div className="relative">
@@ -318,7 +320,7 @@ export function DealDialog({
                   value={valueSetup}
                   onChange={(e) => setValueSetup(Number(e.target.value))}
                   placeholder="0,00"
-                  className="w-full h-[38px] pl-[34px] pr-[10px] bg-[var(--surface)] border border-[var(--line2)] rounded-[8px] text-[var(--fg)] font-semibold text-[13px] focus:outline-none focus:border-[#f0521f]"
+                  className="w-full h-[38px] pl-[34px] pr-[10px] bg-[var(--surface)] border border-[var(--line2)] rounded-[8px] text-[var(--fg)] font-semibold text-[13px] focus:outline-none focus:border-[#0066FF]"
                 />
               </div>
             </div>
@@ -376,7 +378,7 @@ export function DealDialog({
               <select
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
-                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#f0521f]"
+                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#0066FF]"
               >
                 <option value="">Nenhum (Novo Prospect B2B)</option>
                 {clients.map((c) => (
@@ -392,13 +394,12 @@ export function DealDialog({
                 <Calendar className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
                 Previsão de Fechamento
               </label>
-              <input
-                type="date"
+              <CoyDatePicker
                 value={expectedCloseDate}
-                onChange={(e) => setExpectedCloseDate(e.target.value)}
-                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#f0521f]"
-              >
-              </input>
+                onChange={setExpectedCloseDate}
+                placeholder="Selecione a data..."
+                className="w-full h-[40px]"
+              />
             </div>
           </div>
 
@@ -432,18 +433,16 @@ export function DealDialog({
                 <User className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
                 Closer / Responsável
               </label>
-              <select
-                value={assignedMemberId}
-                onChange={(e) => setAssignedMemberId(e.target.value)}
-                className="w-full h-[40px] px-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] focus:outline-none focus:border-[#f0521f]"
-              >
-                <option value="">Não atribuído</option>
-                {orgMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.role})
-                  </option>
-                ))}
-              </select>
+              <CoyAssigneePicker
+                value={orgMembers.find((m) => m.id === assignedMemberId)?.full_name || assignedMemberId}
+                multiple={false}
+                onChange={(selectedName: string) => {
+                  const found = orgMembers.find((m) => m.full_name === selectedName)
+                  setAssignedMemberId(found?.id || selectedName)
+                }}
+                placeholder="Atribuir closer..."
+                className="w-full"
+              />
             </div>
           </div>
 
@@ -457,7 +456,7 @@ export function DealDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ex: Reunião de apresentação realizada, decisor solicitou proposta com migração de ERP inclusa."
-              className="w-full p-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] text-[12.5px] focus:outline-none focus:border-[#f0521f]"
+              className="w-full p-[10px] bg-[var(--bg)] border border-[var(--line2)] rounded-[10px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] text-[12.5px] focus:outline-none focus:border-[#0066FF]"
             />
           </div>
 
@@ -474,7 +473,7 @@ export function DealDialog({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-[20px] h-[40px] rounded-full text-[12.5px] font-bold bg-[#f0521f] hover:bg-[#ff6a36] text-[#141414] flex items-center gap-[8px] transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+              className="px-[20px] h-[40px] rounded-full text-[12.5px] font-bold bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] flex items-center gap-[8px] transition-colors shadow-sm cursor-pointer disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
               <span>{isSubmitting ? 'Salvando...' : initialDeal ? 'Salvar Alterações' : 'Criar Oportunidade'}</span>

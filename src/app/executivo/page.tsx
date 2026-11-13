@@ -85,7 +85,7 @@ export default function ExecutivoMobilePage() {
                 {latestReport.total_automated_runs.toLocaleString('pt-BR')} execuções
               </strong>
               , <strong className="text-[var(--fg)]">{latestReport.total_hours_saved}h poupadas</strong> e{' '}
-              <strong className="text-[#f0521f]">
+              <strong className="text-[#0066FF]">
                 R$ {latestReport.revenue_protected_value.toLocaleString('pt-BR')} protegidos
               </strong>
               .
@@ -111,12 +111,12 @@ export default function ExecutivoMobilePage() {
 
           {/* Header Compacto Mobile */}
           <div className="flex items-center justify-between px-[16px] py-[10px] shrink-0">
-            <span className="font-bold text-[20px] text-[#f0521f] tracking-[-0.5px]">
+            <span className="font-bold text-[20px] text-[#0066FF] tracking-[-0.5px]">
               coydash
             </span>
             <div className="flex items-center bg-[var(--surface)] rounded-full p-[4px] text-[11px]">
               <div className="flex items-center gap-[6px] py-[3px] pr-[10px] pl-[4px] border-r border-[var(--line2)]">
-                <span className="w-[18px] h-[18px] rounded-full bg-[#f0521f] grid place-items-center text-[#141414]">
+                <span className="w-[18px] h-[18px] rounded-full bg-[#0066FF] grid place-items-center text-[#141414]">
                   <IconRobot16 className="w-[11px] h-[11px]" />
                 </span>
                 <span>{agents.length} agentes</span>

@@ -89,7 +89,7 @@ export function AudioPlayer({ src, children }: AudioPlayerProps) {
       <button
         type="button"
         onClick={togglePlay}
-        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--color-brand-orange)] text-[#141414] shrink-0 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--color-brand-blue)] text-white shrink-0 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
         title={isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
       >
         {isPlaying ? (
@@ -112,7 +112,7 @@ export function AudioPlayer({ src, children }: AudioPlayerProps) {
         >
           <div className="w-full h-1 bg-[var(--line)] rounded-full overflow-hidden relative group-hover:h-1.5 transition-all">
             <div
-              className="absolute top-0 left-0 h-full bg-[var(--color-brand-orange)] pointer-events-none transition-all"
+              className="absolute top-0 left-0 h-full bg-[var(--color-brand-blue)] pointer-events-none transition-all"
               style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
             />
           </div>

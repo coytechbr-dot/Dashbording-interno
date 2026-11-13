@@ -10,13 +10,35 @@ import {
   Trash2,
   X,
   Sparkles,
-  CheckSquare,
+  GitBranch,
+  ChevronDown,
+  ChevronRight,
+  Archive,
+  ArchiveRestore,
+  Settings2,
+  Layers,
+  FolderKanban,
+  Milestone,
+  Globe,
+  Palette,
+  Rocket,
+  Users,
+  Building2,
+  Flag,
 } from 'lucide-react'
+import { CoyDropdown, type CoyDropdownOption } from '@/components/ui/coy-dropdown'
+import { CoyColorPicker } from '@/components/ui/coy-color-picker'
 import { useCoyDash } from '@/lib/coydash-store'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
+import { CustomFieldsStudioDialog } from './custom-fields-studio-dialog'
 import type { TaskItem } from '@/types/coydash'
 import { isTaskAssignedToUser } from '@/lib/task-utils'
+import {
+  hasFeaturePermission,
+  canUserDeleteTask,
+  canUserArchiveTask,
+} from '@/lib/access-control'
 
 const DEFAULT_COLUMNS = [
   { id: 'col-todo', name: 'A FAZER', color: '#64748b', order_index: 0 },
@@ -32,15 +54,47 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     taskStatuses,
     tasks,
     clients,
+    orgMembers,
+    currentUserPermissions,
     createTaskFolder,
     createTaskStatus,
     deleteTaskStatusColumn,
     createTask,
     updateTask,
+    archiveTask,
     deleteTask,
     searchQuery,
     authenticatedUser,
   } = useCoyDash()
+
+  const userPermCtx = useMemo(
+    () => ({
+      userId: authenticatedUser?.id,
+      email: authenticatedUser?.email,
+      name: authenticatedUser?.name,
+      role: currentUserPermissions?.role || authenticatedUser?.role,
+      access_type: currentUserPermissions?.access_type,
+      custom_permissions: currentUserPermissions?.custom_permissions,
+    }),
+    [authenticatedUser, currentUserPermissions]
+  )
+
+  const canCreateTask = useMemo(
+    () => hasFeaturePermission(userPermCtx, 'tasks.create'),
+    [userPermCtx]
+  )
+  const canManageColumns = useMemo(
+    () => hasFeaturePermission(userPermCtx, 'tasks.manage_columns'),
+    [userPermCtx]
+  )
+  const canManageCustomFields = useMemo(
+    () => hasFeaturePermission(userPermCtx, 'custom_fields.manage'),
+    [userPermCtx]
+  )
+
+  const [expandedListRows, setExpandedListRows] = useState<Record<string, boolean>>({})
+  const [showArchived, setShowArchived] = useState(false)
+  const [customFieldsStudioOpen, setCustomFieldsStudioOpen] = useState(false)
 
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
   const [selectedListFilter, setSelectedListFilter] = useState<string>(listId || 'ALL')
@@ -93,21 +147,27 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     return taskFolders.find((f) => f.id === activeListObj.folder_id) || null
   }, [activeListObj, taskFolders])
 
-  // Colunas de status ativas para esta lista (ou padrão)
-  const columns = useMemo(() => {
-    const targetId = listId || (selectedListFilter !== 'ALL' ? selectedListFilter : null)
-    if (targetId) {
-      const custom = taskStatuses
-        .filter((s) => s.list_id === targetId)
-        .sort((a, b) => a.order_index - b.order_index)
-      if (custom.length > 0) return custom
+  const subtasksByParentId = useMemo(() => {
+    const map = new Map<string, TaskItem[]>()
+    for (const t of tasks) {
+      if (t.parent_task_id) {
+        const current = map.get(t.parent_task_id) || []
+        current.push(t)
+        map.set(t.parent_task_id, current)
+      }
     }
-    return DEFAULT_COLUMNS
-  }, [listId, selectedListFilter, taskStatuses])
+    return map
+  }, [tasks])
 
   const filteredTasks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return tasks.filter((t) => {
+      // Subtarefas ficam agrupadas dentro da tarefa pai no Kanban (+ X subtarefas) e na expansão da Lista
+      if (t.parent_task_id) return false
+
+      // Filtro de Arquivadas vs Ativas
+      if (Boolean(t.is_archived) !== showArchived) return false
+
       const effectiveList = listId || selectedListFilter
       if (effectiveList && effectiveList !== 'ALL' && t.list_id !== effectiveList) {
         return false
@@ -119,25 +179,35 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
         return false
       }
 
-      // Filtro "Modo Eu" (ClickUp Me Mode) - marcado por padrão:
-      // Quando ativo, só exibe as tarefas em que o usuário logado está marcado como responsável!
+      const childSubs = subtasksByParentId.get(t.id) || []
+
+      // Filtro "Modo Eu" (ClickUp Me Mode) - exibe se o usuário é responsável pelo pai ou por alguma subtarefa
       if (isMeMode) {
-        const isAssigned = isTaskAssignedToUser(t, authenticatedUser)
-        if (!isAssigned) return false
+        const isAssignedParent = isTaskAssignedToUser(t, authenticatedUser)
+        const isAssignedChild = childSubs.some((sub) =>
+          isTaskAssignedToUser(sub, authenticatedUser)
+        )
+        if (!isAssignedParent && !isAssignedChild) return false
       }
 
       if (q) {
-        const match =
+        const matchParent =
           t.title.toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q) ||
           t.client_name_snapshot.toLowerCase().includes(q) ||
           t.assignee_name.toLowerCase().includes(q)
-        if (!match) return false
+        const matchChild = childSubs.some(
+          (sub) =>
+            sub.title.toLowerCase().includes(q) ||
+            sub.assignee_name.toLowerCase().includes(q)
+        )
+        if (!matchParent && !matchChild) return false
       }
       return true
     })
   }, [
     tasks,
+    subtasksByParentId,
     listId,
     selectedListFilter,
     selectedPriorityFilter,
@@ -145,19 +215,157 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     searchQuery,
     isMeMode,
     authenticatedUser,
+    showArchived,
   ])
+
+  // Colunas de status ativas: quando em lista específica, usa as colunas da lista.
+  // Quando em "Todas as listas / setores", reúne as colunas padrão + qualquer status ativo presente nas tarefas da tela!
+  const columns = useMemo(() => {
+    const targetId = listId || (selectedListFilter !== 'ALL' ? selectedListFilter : null)
+    if (targetId) {
+      const custom = taskStatuses
+        .filter((s) => s.list_id === targetId)
+        .sort((a, b) => a.order_index - b.order_index)
+      if (custom.length > 0) return custom
+      return DEFAULT_COLUMNS
+    }
+
+    // MODO MULTI-LISTAS ("Todas as listas / setores"):
+    // 1. Inicia com as colunas padrão
+    const colMap = new Map<string, { id: string; name: string; color: string; order_index: number }>()
+    DEFAULT_COLUMNS.forEach((c) => {
+      colMap.set(c.name.toUpperCase(), { ...c })
+    })
+
+    // 2. Coleta status ativos das tarefas exibidas
+    filteredTasks.forEach((t) => {
+      const statusRaw = (t.status_key || 'A FAZER').trim()
+      const statusUpper = statusRaw.toUpperCase()
+      if (!colMap.has(statusUpper)) {
+        // Busca cor personalizada em taskStatuses se existir
+        const knownStatus = taskStatuses.find((s) => s.name.toUpperCase() === statusUpper)
+        colMap.set(statusUpper, {
+          id: `dyn-${statusUpper.toLowerCase().replace(/\s+/g, '-')}`,
+          name: statusRaw.toUpperCase(),
+          color: knownStatus?.color || '#0066FF',
+          order_index: 10 + colMap.size,
+        })
+      }
+    })
+
+    return Array.from(colMap.values()).sort((a, b) => a.order_index - b.order_index)
+  }, [listId, selectedListFilter, taskStatuses, filteredTasks])
+
+  const archivedCount = useMemo(
+    () => tasks.filter((t) => !t.parent_task_id && Boolean(t.is_archived)).length,
+    [tasks]
+  )
+
+  // Opções estilizadas para dropdowns com ícones de tarefas e setores
+  const listDropdownOptions = useMemo(() => {
+    const listOpts: CoyDropdownOption[] = [
+      {
+        value: 'ALL',
+        label: 'Todas as listas / setores',
+        icon: <Layers className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />,
+        badge: tasks.filter((t) => !t.parent_task_id && !t.is_archived).length,
+      },
+    ]
+
+    taskLists.forEach((l) => {
+      const taskCount = tasks.filter((t) => t.list_id === l.id && !t.parent_task_id && !t.is_archived).length
+      let icon = <FolderKanban className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
+      const nameLower = l.name.toLowerCase()
+      if (nameLower.includes('fase')) {
+        icon = <Milestone className="w-3.5 h-3.5 text-blue-400" />
+      } else if (nameLower.includes('meta') || nameLower.includes('google') || nameLower.includes('tráfego') || nameLower.includes('ads')) {
+        icon = <Globe className="w-3.5 h-3.5 text-cyan-400" />
+      } else if (nameLower.includes('canva') || nameLower.includes('criativo') || nameLower.includes('brand') || nameLower.includes('design')) {
+        icon = <Palette className="w-3.5 h-3.5 text-indigo-400" />
+      } else if (nameLower.includes('kickoff') || nameLower.includes('implantação')) {
+        icon = <Rocket className="w-3.5 h-3.5 text-emerald-400" />
+      }
+
+      listOpts.push({
+        value: l.id,
+        label: l.name,
+        icon,
+        badge: taskCount,
+      })
+    })
+
+    return listOpts
+  }, [taskLists, tasks])
+
+  const clientDropdownOptions = useMemo(() => {
+    const opts: CoyDropdownOption[] = [
+      {
+        value: 'ALL',
+        label: 'Todos os clientes',
+        icon: <Users className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />,
+      },
+    ]
+
+    clients.forEach((c) => {
+      opts.push({
+        value: c.id,
+        label: c.name,
+        icon: <Building2 className="w-3.5 h-3.5 text-[var(--ds-muted)]" />,
+      })
+    })
+
+    return opts
+  }, [clients])
+
+  const priorityDropdownOptions: CoyDropdownOption[] = useMemo(
+    () => [
+      {
+        value: 'ALL',
+        label: 'Todas as prioridades',
+        icon: <Flag className="w-3.5 h-3.5 text-[var(--ds-muted)]" />,
+      },
+      {
+        value: 'urgent',
+        label: 'Urgente',
+        icon: <Flag className="w-3.5 h-3.5 text-red-500 fill-red-500/20" />,
+        colorDot: '#EF4444',
+      },
+      {
+        value: 'high',
+        label: 'Alta',
+        icon: <Flag className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />,
+        colorDot: '#F59E0B',
+      },
+      {
+        value: 'medium',
+        label: 'Média',
+        icon: <Flag className="w-3.5 h-3.5 text-blue-500 fill-blue-500/20" />,
+        colorDot: '#3B82F6',
+      },
+      {
+        value: 'low',
+        label: 'Baixa',
+        icon: <Flag className="w-3.5 h-3.5 text-slate-400" />,
+        colorDot: '#94A3B8',
+      },
+    ],
+    []
+  )
 
   // Membros disponíveis para atribuição
   const availableMembers = useMemo(() => {
     const defaultList = [
+      ...orgMembers.map((m) => m.full_name),
       'Gabrielly Maia',
       'Felipe Cavalcante',
       'Débora Carvalho',
       'Wilton',
       authenticatedUser?.name,
-    ].filter(Boolean) as string[]
+    ]
+      .filter(Boolean)
+      .map((s) => String(s).trim())
     return Array.from(new Set(defaultList))
-  }, [authenticatedUser])
+  }, [orgMembers, authenticatedUser])
 
   const handleOpenCreateModal = (statusName?: string) => {
     setEditingTask(null)
@@ -172,14 +380,15 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     setIsTaskDialogOpen(true)
   }
 
-  const handleSaveTask = async (taskData: Partial<TaskItem>) => {
+  const handleSaveTask = async (taskData: Partial<TaskItem>): Promise<TaskItem | null> => {
     if (editingTask) {
       await updateTask(editingTask.id, taskData)
+      return editingTask
     } else {
-      // Criando nova tarefa: garante que o criador seja automaticamente incluído como responsável
+      // Criando nova tarefa: garante que o criador seja automaticamente incluído caso não haja responsável
       const creatorName = authenticatedUser?.name || 'Administrador'
       const assigneesList = Array.isArray(taskData.assignees) ? [...taskData.assignees] : []
-      if (!assigneesList.some((a) => a.toLowerCase().trim() === creatorName.toLowerCase().trim())) {
+      if (assigneesList.length === 0) {
         assigneesList.push(creatorName)
       }
       const enrichedData = {
@@ -187,7 +396,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
         assignees: assigneesList,
         assignee_name: assigneesList.join(', '),
       }
-      await createTask(enrichedData)
+      return await createTask(enrichedData)
     }
   }
 
@@ -206,6 +415,25 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     }
 
     const nextStatusKey = destination.droppableId
+    const targetTask = tasks.find((t) => t.id === draggableId)
+
+    // Se a tarefa pertencer a uma lista específica e esse status ainda não existir nas colunas da lista,
+    // registra automaticamente em task_statuses para manter a integridade quando filtrar por aquela lista!
+    if (targetTask?.list_id) {
+      const existsInList = taskStatuses.some(
+        (s) => s.list_id === targetTask.list_id && s.name.toUpperCase() === nextStatusKey.toUpperCase()
+      )
+      if (!existsInList) {
+        const destCol = columns.find((c) => c.name.toUpperCase() === nextStatusKey.toUpperCase())
+        await createTaskStatus(
+          targetTask.list_id,
+          nextStatusKey.toUpperCase(),
+          destCol?.color || '#0066FF',
+          columns.length
+        )
+      }
+    }
+
     await updateTask(draggableId, { status_key: nextStatusKey })
   }
 
@@ -256,7 +484,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
             {activeFolderObj && (
               <>
                 <span>/</span>
-                <span className="text-[var(--color-brand-orange)] font-semibold">
+                <span className="text-[var(--color-brand-blue)] font-semibold">
                   {activeFolderObj.name}
                 </span>
               </>
@@ -275,7 +503,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
               onClick={() => handleSetViewMode('kanban')}
               className={`px-[12px] py-[5px] rounded-full text-[12px] font-semibold flex items-center gap-[6px] cursor-pointer transition-colors ${
                 viewMode === 'kanban'
-                  ? 'bg-[var(--color-brand-orange)] text-[#141414]'
+                  ? 'bg-[var(--color-brand-blue)] text-white'
                   : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
               }`}
             >
@@ -287,7 +515,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
               onClick={() => handleSetViewMode('list')}
               className={`px-[12px] py-[5px] rounded-full text-[12px] font-semibold flex items-center gap-[6px] cursor-pointer transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-[var(--color-brand-orange)] text-[#141414]'
+                  ? 'bg-[var(--color-brand-blue)] text-white'
                   : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
               }`}
             >
@@ -296,25 +524,39 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
             </button>
           </div>
 
-          {activeListObj && (
+          {activeListObj && canManageColumns && (
             <button
               type="button"
               onClick={() => setStatusModalOpen(true)}
-              className="h-[38px] px-[14px] rounded-full bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] text-[12px] font-medium flex items-center gap-[6px] cursor-pointer transition-colors"
+              className="h-[38px] px-[14px] rounded-full bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] hover:border-[var(--color-brand-blue)]/50 text-[12px] font-medium flex items-center gap-[6px] cursor-pointer transition-colors"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--color-brand-orange)]" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
               <span>Gerenciar Status</span>
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => handleOpenCreateModal(columns[0]?.name || 'A FAZER')}
-            className="h-[38px] px-[18px] rounded-full bg-[var(--color-brand-orange)] hover:bg-[var(--color-brand-orange-hover)] text-[#141414] font-bold text-[13px] flex items-center gap-[6px] cursor-pointer transition-colors"
-          >
-            <Plus className="w-4 h-4" strokeWidth={2.5} />
-            <span>Nova Tarefa</span>
-          </button>
+          {canManageCustomFields && (
+            <button
+              type="button"
+              onClick={() => setCustomFieldsStudioOpen(true)}
+              className="h-[38px] px-[14px] rounded-full bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] hover:border-[var(--color-brand-blue)]/50 text-[12px] font-semibold flex items-center gap-[6px] cursor-pointer transition-colors"
+              title="Abrir Configurações de Campos Personalizados, Modelos e Grupos"
+            >
+              <Settings2 className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
+              <span>Configurar Campos</span>
+            </button>
+          )}
+
+          {canCreateTask && (
+            <button
+              type="button"
+              onClick={() => handleOpenCreateModal(columns[0]?.name || 'A FAZER')}
+              className="h-[38px] px-[18px] rounded-full bg-[var(--color-brand-blue)] hover:bg-[var(--color-brand-blue-hover)] text-white font-bold text-[13px] flex items-center gap-[6px] cursor-pointer transition-colors shadow-xs"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <span>Nova Tarefa</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -326,7 +568,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
           onClick={() => setIsMeMode((prev) => !prev)}
           className={`h-[34px] px-[13px] rounded-full border text-[12px] font-semibold flex items-center gap-[7px] cursor-pointer transition-all select-none ${
             isMeMode
-              ? 'bg-[var(--color-brand-orange)]/15 border-[var(--color-brand-orange)] text-[var(--color-brand-orange)] shadow-xs'
+              ? 'bg-[var(--color-brand-blue)]/15 border-[var(--color-brand-blue)] text-[var(--color-brand-blue)] shadow-xs'
               : 'bg-[var(--surface)] hover:bg-[var(--ds-hover)] border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)]'
           }`}
           title={
@@ -338,7 +580,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
           <div
             className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9.5px] font-bold ${
               isMeMode
-                ? 'bg-[var(--color-brand-orange)] text-[#141414]'
+                ? 'bg-[var(--color-brand-blue)] text-white'
                 : 'bg-[var(--bg)] border border-[var(--line2)] text-[var(--ds-muted)]'
             }`}
           >
@@ -355,58 +597,70 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
           <span
             className={`px-[6px] py-[1px] rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
               isMeMode
-                ? 'bg-[var(--color-brand-orange)]/25 text-[var(--color-brand-orange)]'
+                ? 'bg-[var(--color-brand-blue)]/20 text-[var(--color-brand-blue)]'
                 : 'bg-[var(--bg)] text-[var(--ds-muted)] border border-[var(--line2)]'
             }`}
           >
             {isMeMode ? 'Ativo' : 'Todos'}
           </span>
         </button>
+
+        {/* DROPDOWNS CUSTOMIZADOS COM ESTILO PREMIUM E ÍCONES DE TAREFA */}
         {!listId && (
-          <select
+          <CoyDropdown
             value={selectedListFilter}
-            onChange={(e) => setSelectedListFilter(e.target.value)}
-            className="h-[34px] px-[12px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[12px] text-[var(--fg)] outline-none cursor-pointer"
-          >
-            <option value="ALL">Todas as listas / setores</option>
-            {taskLists.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedListFilter}
+            options={listDropdownOptions}
+            searchable={listDropdownOptions.length > 5}
+            searchPlaceholder="Buscar setor / lista..."
+            className="min-w-[190px]"
+            title="Filtrar por Lista ou Setor"
+          />
         )}
 
-        <select
+        <CoyDropdown
           value={selectedClientFilter}
-          onChange={(e) => setSelectedClientFilter(e.target.value)}
-          className="h-[34px] px-[12px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[12px] text-[var(--fg)] outline-none cursor-pointer"
-        >
-          <option value="ALL">Todos os clientes</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          onChange={setSelectedClientFilter}
+          options={clientDropdownOptions}
+          searchable={clientDropdownOptions.length > 5}
+          searchPlaceholder="Buscar cliente..."
+          className="min-w-[170px]"
+          title="Filtrar por Cliente"
+        />
 
-        <select
+        <CoyDropdown
           value={selectedPriorityFilter}
-          onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-          className="h-[34px] px-[12px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[12px] text-[var(--fg)] outline-none cursor-pointer"
+          onChange={setSelectedPriorityFilter}
+          options={priorityDropdownOptions}
+          searchable={false}
+          className="min-w-[160px]"
+          title="Filtrar por Prioridade"
+        />
+
+        <button
+          type="button"
+          onClick={() => setShowArchived((prev) => !prev)}
+          className={`h-[34px] px-[12px] rounded-full border text-[12px] font-medium flex items-center gap-[6px] cursor-pointer transition-colors ${
+            showArchived
+              ? 'bg-[var(--color-brand-blue)]/15 border-[var(--color-brand-blue)] text-[var(--color-brand-blue)]'
+              : 'bg-[var(--surface)] hover:bg-[var(--ds-hover)] border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)]'
+          }`}
+          title="Alternar entre tarefas ativas e tarefas arquivadas"
         >
-          <option value="ALL">Todas as prioridades</option>
-          <option value="urgent">Urgente</option>
-          <option value="high">Alta</option>
-          <option value="medium">Média</option>
-          <option value="low">Baixa</option>
-        </select>
+          <Archive className="w-3.5 h-3.5" />
+          <span>{showArchived ? 'Exibindo Arquivadas' : 'Arquivadas'}</span>
+          {archivedCount > 0 && (
+            <span className="px-[5px] py-[1px] rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[10px] font-bold tabular-nums">
+              {archivedCount}
+            </span>
+          )}
+        </button>
 
         {tasks.length === 0 && (
           <button
             type="button"
             onClick={handleSeedSampleWorkspace}
-            className="h-[34px] px-[14px] rounded-full bg-[var(--color-brand-orange)]/15 border border-[var(--color-brand-orange)]/40 text-[var(--color-brand-orange)] text-[12px] font-semibold flex items-center gap-[6px] cursor-pointer"
+            className="h-[34px] px-[14px] rounded-full bg-[var(--color-brand-blue)]/15 border border-[var(--color-brand-blue)]/40 text-[var(--color-brand-blue)] text-[12px] font-semibold flex items-center gap-[6px] cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Criar Setores & Tarefas de Exemplo</span>
@@ -444,14 +698,16 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCreateModal(col.name)}
-                        className="w-[24px] h-[24px] rounded-[6px] hover:bg-[var(--bg)] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--color-brand-orange)] cursor-pointer transition-colors"
-                        title={`Adicionar tarefa em ${col.name}`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      {canCreateTask && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCreateModal(col.name)}
+                          className="w-[24px] h-[24px] rounded-[6px] hover:bg-[var(--bg)] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--color-brand-blue)] cursor-pointer transition-colors"
+                          title={`Adicionar tarefa em ${col.name}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {/* Droppable Container */}
@@ -462,18 +718,23 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
                           {...provided.droppableProps}
                           className={`flex flex-col gap-[10px] min-h-[260px] rounded-[12px] transition-colors ${
                             snapshot.isDraggingOver
-                              ? 'bg-[var(--color-brand-orange)]/5 p-[4px]'
+                              ? 'bg-[var(--color-brand-blue)]/5 p-[4px]'
                               : ''
                           }`}
                         >
-                          {colTasks.map((task, index) => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              index={index}
-                              onEdit={(t, tab) => handleOpenEditModal(t, tab)}
-                            />
-                          ))}
+                          {colTasks.map((task, index) => {
+                            const taskListObj = task.list_id ? taskLists.find((l) => l.id === task.list_id) : null
+                            return (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                subtasks={subtasksByParentId.get(task.id) || []}
+                                listName={!listId && selectedListFilter === 'ALL' ? taskListObj?.name : undefined}
+                                onEdit={(t, tab) => handleOpenEditModal(t, tab)}
+                              />
+                            )
+                          })}
                           {provided.placeholder}
                         </div>
                       )}
@@ -496,7 +757,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
                 <th className="py-[12px] px-[12px]">Prioridade</th>
                 <th className="py-[12px] px-[12px]">Responsáveis</th>
                 <th className="py-[12px] px-[12px]">Prazo</th>
-                <th className="py-[12px] px-[12px]">Checklist</th>
+                <th className="py-[12px] px-[12px]">Subtarefas</th>
                 <th className="py-[12px] px-[16px] text-right">Ações</th>
               </tr>
             </thead>
@@ -509,78 +770,190 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
                 </tr>
               ) : (
                 filteredTasks.map((t) => {
-                  const doneSub = (t.subtasks || []).filter((s) => s.is_completed).length
-                  const totalSub = (t.subtasks || []).length
+                  const childSubs = subtasksByParentId.get(t.id) || []
+                  const totalSub = childSubs.length
+                  const isExpanded = Boolean(expandedListRows[t.id])
+                  const canArchiveRow = canUserArchiveTask(userPermCtx, t)
+                  const canDeleteRow = canUserDeleteTask(userPermCtx, t)
+
                   return (
-                    <tr
-                      key={t.id}
-                      onClick={() => handleOpenEditModal(t, 'details')}
-                      className="border-b border-[var(--line)] hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
-                    >
-                      <td className="py-[12px] px-[16px] font-semibold text-[var(--fg)]">
-                        {t.title}
-                      </td>
-                      <td className="py-[12px] px-[12px] text-[var(--ds-muted)]">
-                        {t.client_name_snapshot || '—'}
-                      </td>
-                      <td className="py-[12px] px-[12px]">
-                        <span className="px-[8px] py-[2px] rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[11px] font-semibold">
-                          {t.status_key}
-                        </span>
-                      </td>
-                      <td className="py-[12px] px-[12px]">
-                        <span
-                          className={`px-[8px] py-[2px] rounded-[6px] border text-[10.5px] font-bold ${
-                            t.priority === 'urgent'
-                              ? 'bg-red-500/15 text-red-600 border-red-500/30'
-                              : t.priority === 'high'
-                                ? 'bg-orange-500/15 text-orange-600 border-orange-500/30'
-                                : t.priority === 'medium'
-                                  ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                                  : 'bg-green-500/15 text-green-600 border-green-500/30'
-                          }`}
-                        >
-                          {t.priority === 'urgent'
-                            ? 'Urgente'
-                            : t.priority === 'high'
-                              ? 'Alta'
-                              : t.priority === 'medium'
-                                ? 'Média'
-                                : 'Baixa'}
-                        </span>
-                      </td>
-                      <td className="py-[12px] px-[12px] text-[var(--fg)]">
-                        {t.assignees && t.assignees.length > 0
-                          ? t.assignees.join(', ')
-                          : t.assignee_name || '—'}
-                      </td>
-                      <td className="py-[12px] px-[12px] text-[var(--ds-muted)] font-mono text-[12px]">
-                        {t.due_date || '—'}
-                      </td>
-                      <td className="py-[12px] px-[12px]">
-                        {totalSub > 0 ? (
-                          <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--ds-muted)] font-medium">
-                            <CheckSquare className="w-3.5 h-3.5 text-[var(--color-brand-orange)]" />
-                            {doneSub}/{totalSub}
+                    <React.Fragment key={t.id}>
+                      <tr
+                        onClick={() => handleOpenEditModal(t, 'details')}
+                        className="border-b border-[var(--line)] hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
+                      >
+                        <td className="py-[12px] px-[16px] font-semibold text-[var(--fg)]">
+                          <div className="flex items-center gap-2">
+                            {totalSub > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
+                                }}
+                                className="p-0.5 rounded hover:bg-[var(--line2)] text-[var(--ds-muted)]"
+                                title="Expandir subtarefas"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                            <span>{t.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-[12px] px-[12px] text-[var(--ds-muted)]">
+                          {t.client_name_snapshot || '—'}
+                        </td>
+                        <td className="py-[12px] px-[12px]">
+                          <span className="px-[8px] py-[2px] rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[11px] font-semibold">
+                            {t.status_key}
                           </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="py-[12px] px-[16px] text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteTask(t.id)
-                          }}
-                          className="text-[var(--ds-muted)] hover:text-red-500 cursor-pointer p-1"
-                          title="Excluir tarefa"
-                        >
-                          <Trash2 className="w-4 h-4 inline" />
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="py-[12px] px-[12px]">
+                          <span
+                            className={`px-[8px] py-[2px] rounded-[6px] border text-[10.5px] font-bold ${
+                              t.priority === 'urgent'
+                                ? 'bg-red-500/15 text-red-600 border-red-500/30'
+                                : t.priority === 'high'
+                                  ? 'bg-orange-500/15 text-orange-600 border-orange-500/30'
+                                  : t.priority === 'medium'
+                                    ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
+                                    : 'bg-green-500/15 text-green-600 border-green-500/30'
+                            }`}
+                          >
+                            {t.priority === 'urgent'
+                              ? 'Urgente'
+                              : t.priority === 'high'
+                                ? 'Alta'
+                                : t.priority === 'medium'
+                                  ? 'Média'
+                                  : 'Baixa'}
+                          </span>
+                        </td>
+                        <td className="py-[12px] px-[12px] text-[var(--fg)]">
+                          {t.assignees && t.assignees.length > 0
+                            ? t.assignees.join(', ')
+                            : t.assignee_name || '—'}
+                        </td>
+                        <td className="py-[12px] px-[12px] text-[var(--ds-muted)] font-mono text-[12px]">
+                          {t.due_date || '—'}
+                        </td>
+                        <td className="py-[12px] px-[12px]">
+                          {totalSub > 0 ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[11px] text-[var(--fg)] font-semibold hover:border-[var(--color-brand-blue)] cursor-pointer"
+                            >
+                              <GitBranch className="w-3 h-3 text-[var(--color-brand-blue)]" />
+                              <span>+ {totalSub} subtarefas</span>
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="py-[12px] px-[16px] text-right">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {canArchiveRow && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void archiveTask(t.id, !Boolean(t.is_archived))
+                                }}
+                                className="text-[var(--ds-muted)] opacity-55 hover:opacity-100 hover:text-[var(--color-brand-blue)] cursor-pointer p-1 transition-opacity"
+                                title={t.is_archived ? 'Restaurar tarefa' : 'Arquivar tarefa'}
+                              >
+                                {t.is_archived ? (
+                                  <ArchiveRestore className="w-3.5 h-3.5 inline" />
+                                ) : (
+                                  <Archive className="w-3.5 h-3.5 inline" />
+                                )}
+                              </button>
+                            )}
+                            {canDeleteRow && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (confirm('Tem certeza que deseja excluir esta tarefa e suas subtarefas?')) {
+                                    void handleDeleteTask(t.id)
+                                  }
+                                }}
+                                className="text-[var(--ds-muted)] opacity-40 hover:opacity-100 hover:text-red-500 cursor-pointer p-1 transition-opacity"
+                                title="Remover tarefa"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 inline" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded &&
+                        childSubs.map((sub) => {
+                          const canDeleteSub = canUserDeleteTask(userPermCtx, sub)
+                          return (
+                          <tr
+                            key={sub.id}
+                            onClick={() => handleOpenEditModal(sub, 'details')}
+                            className="border-b border-[var(--line)] bg-[var(--bg)]/50 hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
+                          >
+                            <td className="py-[10px] pl-[40px] pr-[16px] text-[12.5px] text-[var(--fg)]">
+                              <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-blue)] shrink-0" />
+                                <span>{sub.title}</span>
+                              </div>
+                            </td>
+                            <td className="py-[10px] px-[12px] text-[12px] text-[var(--ds-muted)]">
+                              {sub.client_name_snapshot || '—'}
+                            </td>
+                            <td className="py-[10px] px-[12px]">
+                              <span className="px-[8px] py-[2px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[10.5px] font-semibold">
+                                {sub.status_key}
+                              </span>
+                            </td>
+                            <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
+                              {sub.priority}
+                            </td>
+                            <td className="py-[10px] px-[12px] text-[12px] text-[var(--fg)]">
+                              {sub.assignees && sub.assignees.length > 0
+                                ? sub.assignees.join(', ')
+                                : sub.assignee_name || '—'}
+                            </td>
+                            <td className="py-[10px] px-[12px] text-[var(--ds-muted)] font-mono text-[11.5px]">
+                              {sub.due_date || '—'}
+                            </td>
+                            <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
+                              Subtarefa
+                            </td>
+                            <td className="py-[10px] px-[16px] text-right">
+                              {canDeleteSub && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (confirm('Remover esta subtarefa permanentemente?')) {
+                                      void handleDeleteTask(sub.id)
+                                    }
+                                  }}
+                                  className="text-[var(--ds-muted)] opacity-40 hover:opacity-100 hover:text-red-500 cursor-pointer p-1"
+                                  title="Remover subtarefa"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 inline" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          )
+                        })}
+                    </React.Fragment>
                   )
                 })
               )}
@@ -589,7 +962,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
         </div>
       )}
 
-      {/* MODAL TASKDIALOG (ROOMIE OFFICE AI) EM 3 COLUNAS: DETALHES, BARRA CENTRAL E COMENTÁRIOS */}
+      {/* MODAL TASKDIALOG (ROOMIE OFFICE AI) */}
       <TaskDialog
         open={isTaskDialogOpen}
         onOpenChange={setIsTaskDialogOpen}
@@ -604,6 +977,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
         currentUserName={authenticatedUser?.name || 'Administrador'}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
+        onSelectTask={(target) => setEditingTask(target)}
       />
 
       {/* MODAL GERENCIAR STATUS (COLUNAS DO KANBAN) */}
@@ -664,11 +1038,9 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
               }}
               className="flex items-center gap-[8px] pt-[8px] border-t border-[var(--line)]"
             >
-              <input
-                type="color"
+              <CoyColorPicker
                 value={newStatusColor}
-                onChange={(e) => setNewStatusColor(e.target.value)}
-                className="w-[38px] h-[38px] rounded-[8px] bg-transparent border-0 cursor-pointer"
+                onChange={setNewStatusColor}
               />
               <input
                 value={newStatusName}
@@ -678,7 +1050,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
               />
               <button
                 type="submit"
-                className="h-[38px] px-[14px] rounded-[8px] bg-[var(--color-brand-orange)] hover:bg-[var(--color-brand-orange-hover)] text-[#141414] font-bold text-[12px] cursor-pointer"
+                className="h-[38px] px-[14px] rounded-[8px] bg-[var(--color-brand-blue)] hover:bg-[var(--color-brand-blue-hover)] text-white font-bold text-[12px] cursor-pointer"
               >
                 Adicionar
               </button>
@@ -686,6 +1058,14 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
           </div>
         </div>
       )}
+
+      {/* ESTÚDIO AVANÇADO DE CAMPOS PERSONALIZADOS */}
+      <CustomFieldsStudioDialog
+        open={customFieldsStudioOpen}
+        onOpenChange={setCustomFieldsStudioOpen}
+        initialTab="grupos"
+        currentListId={activeListObj?.id || listId}
+      />
     </div>
   )
 }

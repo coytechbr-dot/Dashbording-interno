@@ -54,7 +54,7 @@ export function TaskChecklist({ subtasks, onChange }: TaskChecklistProps) {
       {totalCount > 0 && (
         <div className="h-1.5 w-full bg-[var(--line2)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-[var(--color-brand-orange)] transition-all duration-300"
+            className="h-full bg-[var(--color-brand-blue)] transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -73,8 +73,8 @@ export function TaskChecklist({ subtasks, onChange }: TaskChecklistProps) {
               onClick={() => handleToggle(st.id)}
               className={`shrink-0 w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors cursor-pointer ${
                 st.is_completed
-                  ? 'bg-[var(--color-brand-orange)] border-[var(--color-brand-orange)] text-[#141414]'
-                  : 'bg-[var(--surface)] border-[var(--line2)] hover:border-[var(--color-brand-orange)]'
+                  ? 'bg-[var(--color-brand-blue)] border-[var(--color-brand-blue)] text-[#141414]'
+                  : 'bg-[var(--surface)] border-[var(--line2)] hover:border-[var(--color-brand-blue)]'
               }`}
             >
               {st.is_completed && <Check className="w-3 h-3 stroke-[2.8]" />}
@@ -118,7 +118,7 @@ export function TaskChecklist({ subtasks, onChange }: TaskChecklistProps) {
           onClick={handleAdd}
           disabled={!newItemTitle.trim()}
           variant="outline"
-          className="h-[36px] w-[36px] p-0 shrink-0 text-[var(--color-brand-orange)] border-[var(--line2)] hover:bg-[var(--color-brand-orange)]/10 cursor-pointer rounded-lg"
+          className="h-[36px] w-[36px] p-0 shrink-0 text-[var(--color-brand-blue)] border-[var(--line2)] hover:bg-[var(--color-brand-blue)]/10 cursor-pointer rounded-lg"
           title="Adicionar"
         >
           <Plus className="w-4 h-4" />

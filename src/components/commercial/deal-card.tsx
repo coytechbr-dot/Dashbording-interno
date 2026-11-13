@@ -15,6 +15,7 @@ import {
   TrendingUp,
   DollarSign,
   ArrowUpRight,
+  FileText,
 } from 'lucide-react'
 import type { DealItem, PipelineStageItem, DealPriority } from '@/types/coydash'
 
@@ -25,12 +26,13 @@ interface DealCardProps {
   onEdit: (deal: DealItem) => void
   onDelete: (dealId: string) => void
   onConvert: (deal: DealItem) => void
+  onRequestProposal?: (deal: DealItem) => void
 }
 
 const PRIORITY_BADGES: Record<DealPriority, { label: string; dot: string }> = {
   low: { label: 'Baixa', dot: 'bg-[#2f9e5a]' },
   medium: { label: 'Média', dot: 'bg-[#38bdf8]' },
-  high: { label: 'Alta', dot: 'bg-[#f0521f]' },
+  high: { label: 'Alta', dot: 'bg-[#0066FF]' },
   urgent: { label: 'Urgente', dot: 'bg-[#ef4444]' },
 }
 
@@ -58,6 +60,7 @@ export function DealCard({
   onEdit,
   onDelete,
   onConvert,
+  onRequestProposal,
 }: DealCardProps) {
   const router = useRouter()
   const priorityInfo = PRIORITY_BADGES[deal.priority || 'medium']
@@ -81,7 +84,7 @@ export function DealCard({
           onClick={() => onEdit(deal)}
           className={`p-[14px] rounded-[14px] bg-[var(--surface)] border transition-all cursor-pointer flex flex-col gap-[10px] select-none ${
             snapshot.isDragging
-              ? 'border-[#f0521f] shadow-xl rotate-1 scale-[1.02] z-50 ring-2 ring-[#f0521f]/20'
+              ? 'border-[#0066FF] shadow-xl rotate-1 scale-[1.02] z-50 ring-2 ring-[#0066FF]/20'
               : 'border-[var(--line2)] hover:border-[var(--line)] shadow-sm'
           }`}
         >
@@ -174,7 +177,7 @@ export function DealCard({
             <div className="flex items-center gap-[5px]">
               {deal.assigned_member_name ? (
                 <>
-                  <div className="w-[18px] h-[18px] rounded-full bg-[#f0521f]/15 text-[#f0521f] font-bold text-[9px] flex items-center justify-center">
+                  <div className="w-[18px] h-[18px] rounded-full bg-[#0066FF]/15 text-[#0066FF] font-bold text-[9px] flex items-center justify-center">
                     {deal.assigned_member_name.charAt(0).toUpperCase()}
                   </div>
                   <span className="truncate max-w-[100px]">{deal.assigned_member_name}</span>
@@ -191,6 +194,22 @@ export function DealCard({
               </div>
             )}
           </div>
+
+          {/* Ação: Solicitar Proposta Comercial */}
+          {onRequestProposal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRequestProposal(deal)
+              }}
+              className="w-full h-[30px] rounded-[8px] bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] hover:border-[var(--color-brand-blue)]/50 text-[11px] font-semibold text-[var(--fg)] flex items-center justify-center gap-[5px] transition-colors cursor-pointer"
+              title="Gerar tarefa de proposta comercial na lista de Leads"
+            >
+              <FileText className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
+              <span>Solicitar Proposta Comercial</span>
+            </button>
+          )}
 
           {/* Botão de Sucesso 1-Clique: Converter em Cliente 360º quando Won ou em estágio final */}
           {isWon && !deal.client_id && (

@@ -1,258 +1,112 @@
 'use client'
 
-import React, { useActionState, useState } from 'react'
+import React from 'react'
 import Link from 'next/link'
-import { ArrowUpRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { PasswordInput } from '@/components/ui/password-input'
-import { signup } from '@/app/actions/auth'
+import { ArrowUpRight, Lock, ShieldCheck } from 'lucide-react'
+import {
+  IllustrationFocusRoom,
+  IllustrationAiAgents,
+  IllustrationTeamLounge,
+} from '@/components/layout/roomie-illustrations'
 
 export default function CadastroPage() {
-  const [state, formAction, isPending] = useActionState(signup, null)
-  const [selectedSize, setSelectedSize] = useState('6–20')
-  const [passwordValue, setPasswordValue] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(true)
-
-  const strengthLevel =
-    passwordValue.length === 0
-      ? 0
-      : passwordValue.length < 6
-        ? 1
-        : passwordValue.length < 10
-          ? 2
-          : /[A-Z]/.test(passwordValue) && /[0-9]/.test(passwordValue)
-            ? 4
-            : 3
-
   return (
     <div className="w-full min-h-screen bg-[var(--bg)] text-[var(--fg)] overflow-hidden grid grid-cols-1 md:grid-cols-2 p-[14px] gap-[14px] box-border">
-      {/* Esquerda (Exato de src/app/(auth)/cadastro/page.tsx do ROOMIE OFFICE AI) */}
+      {/* Esquerda */}
       <div className="flex-1 flex flex-col p-[26px] md:pl-[40px] md:pr-[52px]">
-        <div className="flex justify-between items-center mb-8 md:mb-0">
-          <div className="font-bold text-[26px] leading-none text-[#0066FF] tracking-[-0.5px]">
-            coydash
-          </div>
-          <div className="text-[12px] text-[var(--ds-muted)]">Etapa 1 de 2</div>
+        <div className="font-bold text-[26px] leading-none text-[#0066FF] tracking-[-0.5px]">
+          coydash
         </div>
 
-        <div className="my-auto flex flex-col gap-[22px] max-w-[420px] w-full mx-auto md:mx-0 py-4">
-          <div className="flex flex-col gap-[10px]">
-            <h1 className="font-semibold text-[42px] leading-[1.02] tracking-[-1.4px] text-balance">
-              Crie sua operação
+        <div className="my-auto flex flex-col gap-[24px] max-w-[420px] w-full mx-auto md:mx-0">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[11.5px] font-semibold text-[#0066FF] w-fit">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Plataforma Interna Coytech</span>
+          </div>
+
+          <div className="flex flex-col gap-[12px]">
+            <h1 className="font-semibold text-[38px] leading-[1.04] tracking-[-1.2px] text-balance">
+              Cadastro público desativado
             </h1>
-            <p className="text-[14px] text-[var(--ds-muted)]">
-              Monte o ecossistema da sua empresa em poucos minutos.
+            <p className="text-[14px] text-[var(--ds-muted)] leading-relaxed">
+              O CoyDash é um ambiente interno restrito. Novas contas de acesso são criadas exclusivamente por membros autorizados dentro do painel administrativo da Coytech.
             </p>
           </div>
 
-          {state?.error && (
-            <div className="p-3 bg-[var(--surface)] text-[#0066FF] border border-[#0066FF] text-[13px] rounded-[12px]">
-              {state.error}
+          <div className="p-4 rounded-[14px] bg-[var(--surface)] border border-[var(--line2)] flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-[#2F9E5A] shrink-0 mt-0.5" />
+            <div className="text-[12.5px] text-[var(--fg)] leading-relaxed">
+              Se você faz parte da equipe ou é um membro convidado, utilize o <strong>e-mail e senha</strong> fornecidos pela administração para entrar.
             </div>
-          )}
-
-          <form action={formAction} className="flex flex-col gap-[14px]">
-            <input type="hidden" name="team_size" value={selectedSize} />
-
-            <div className="grid grid-cols-2 gap-[12px]">
-              <label className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)]">
-                Nome completo
-                <Input
-                  type="text"
-                  name="name"
-                  placeholder="Rodrigo Almeida"
-                  required
-                  className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] text-[var(--fg)] rounded-[12px]"
-                />
-              </label>
-              <label className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)]">
-                Empresa
-                <Input
-                  type="text"
-                  name="company"
-                  placeholder="Acme Ltda."
-                  required
-                  className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] text-[var(--fg)] rounded-[12px]"
-                />
-              </label>
-            </div>
-
-            <label className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)]">
-              E-mail de trabalho
-              <Input
-                type="email"
-                name="email"
-                placeholder="voce@empresa.com.br"
-                required
-                className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] text-[var(--fg)] rounded-[12px]"
-              />
-            </label>
-
-            <div className="flex flex-col gap-[6px]">
-              <label className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)]">
-                Senha
-                <PasswordInput
-                  name="password"
-                  value={passwordValue}
-                  onChange={(e) => setPasswordValue(e.target.value)}
-                  placeholder="Mínimo de 6 caracteres"
-                  required
-                  className="h-[48px] bg-[var(--surface)] border-[1.5px] border-[var(--line2)] text-[var(--fg)] rounded-[12px]"
-                />
-              </label>
-              <div className="grid grid-cols-4 gap-[4px] mt-1">
-                {[1, 2, 3, 4].map((bar) => (
-                  <span
-                    key={bar}
-                    className={`h-[3px] rounded-full transition-colors ${
-                      strengthLevel >= bar ? 'bg-[#0066FF]' : 'bg-[var(--line2)]'
-                    }`}
-                  ></span>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-[8px] text-[12px] text-[var(--ds-muted)] mt-2">
-              Tamanho da equipe
-              <div className="flex flex-wrap gap-[8px]">
-                {['1–5', '6–20', '21–50', '51–200', '200+'].map((size) => {
-                  const on = size === selectedSize
-                  return (
-                    <button
-                      type="button"
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`flex items-center h-[36px] px-[14px] rounded-full text-[13px] cursor-pointer border-[1.5px] transition-colors ${
-                        on
-                          ? 'bg-[#0066FF] text-white border-[#0066FF] font-medium'
-                          : 'bg-[var(--surface)] text-[var(--fg)] border-[var(--line2)]'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setAcceptedTerms(!acceptedTerms)}
-              className="flex items-center gap-[10px] text-[12px] text-[var(--ds-muted)] mt-2 text-left cursor-pointer"
-            >
-              <span
-                className={`w-[16px] h-[16px] rounded-[4px] flex items-center justify-center shrink-0 border ${
-                  acceptedTerms
-                    ? 'bg-[#0066FF] border-[#0066FF] text-[#141414]'
-                    : 'bg-[var(--surface)] border-[var(--line2)]'
-                }`}
-              >
-                {acceptedTerms && (
-                  <svg
-                    width="9"
-                    height="9"
-                    viewBox="0 0 8 8"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                  >
-                    <path d="m1 4 2 2 4-4"></path>
-                  </svg>
-                )}
-              </span>
-              <span>
-                Concordo com os <span className="text-[#0066FF] underline">Termos de uso</span> e a{' '}
-                <span className="text-[#0066FF] underline">Política de privacidade</span>
-              </span>
-            </button>
-
-            <Button
-              className="w-full h-[50px] bg-[var(--color-brand-orange)] hover:bg-[var(--color-brand-orange-hover)] text-[#141414] rounded-full text-[14px] font-semibold flex justify-between items-center px-5 mt-2 cursor-pointer"
-              type="submit"
-              disabled={isPending || !acceptedTerms}
-            >
-              <span>{isPending ? 'Criando...' : 'Criar operação'}</span>
-              <ArrowUpRight className="w-4 h-4" strokeWidth={2.5} />
-            </Button>
-          </form>
-
-          <div className="text-[13px] text-[var(--ds-muted)]">
-            Já tem uma conta?{' '}
-            <Link
-              href="/login"
-              className="text-[var(--color-brand-orange)] hover:underline font-medium"
-            >
-              Entrar
-            </Link>
           </div>
+
+          <Link
+            href="/login"
+            className="w-full h-[50px] bg-[#0066FF] hover:bg-[#0052CC] text-[#141414] rounded-full text-[14px] font-semibold flex justify-between items-center px-5 cursor-pointer shadow-sm transition-colors"
+          >
+            <span>Ir para o Login</span>
+            <ArrowUpRight className="w-4 h-4" strokeWidth={2.5} />
+          </Link>
+        </div>
+
+        <div className="text-[11px] text-[var(--ds-muted)] mt-auto">
+          © 2026 coydash · Acesso Corporativo Interno
         </div>
       </div>
 
-      {/* Direita (com Background Azul Gradiente / Imagem) */}
-      <div className="hidden md:flex flex-1 m-[14px] ml-0 bg-accent-blue-card rounded-[18px] relative overflow-hidden flex-col p-[40px] text-white shadow-xl">
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        <div className="text-[14px] text-white/90 drop-shadow-sm">Seus primeiros agentes</div>
-        <div className="font-semibold text-[40px] leading-[1.02] tracking-[-1.4px] mt-[18px] max-w-[440px] text-balance text-white drop-shadow-md">
-          Uma equipe de IA pronta no primeiro dia
+      {/* Direita */}
+      <div className="hidden md:flex flex-1 m-[14px] ml-0 bg-[var(--hero)] rounded-[18px] relative overflow-hidden flex-col p-[40px]">
+        <div className="text-[14px] text-[var(--hero-sub)]">
+          Segurança &amp; Governança Corporativa
+        </div>
+        <div className="font-semibold text-[40px] leading-[1.02] tracking-[-1.4px] mt-[18px] max-w-[440px] text-balance text-[var(--fg)]">
+          Acesso controlado diretamente pela equipe Coytech
         </div>
 
-        <div className="flex flex-col gap-[12px] mt-[28px] text-[14px] relative z-10 text-white drop-shadow-sm">
-          <div className="flex items-center gap-[12px]">
-            <span className="w-[24px] h-[24px] rounded-full bg-white text-[#0066FF] flex items-center justify-center text-[11px] font-bold flex-none shadow-sm">
-              1
-            </span>
-            <span>
-              <b className="font-semibold text-white">Coytech Studio</b> — filas com aprovação em 1 clique (&lt; 3s)
-            </span>
+        <div className="absolute left-[40px] right-[-40px] bottom-[-30px] h-[360px]">
+          <div className="absolute left-[0px] bottom-[40px] w-[210px] h-[280px] bg-[#f4f4f2] rounded-[14px] p-[18px] text-[#141414] flex flex-col overflow-hidden rotate-[-6deg]">
+            <div className="flex justify-between items-center text-[11px] font-semibold relative z-10">
+              <span className="text-[#0066FF]">01</span>
+              <span className="flex items-center gap-[5px] font-medium bg-[#e6e5e1] text-[#141414] rounded-full px-[8px] py-[3px] text-[10px]">
+                <span className="w-[5px] h-[5px] rounded-full bg-[#2f9e5a]"></span>
+                Protegido
+              </span>
+            </div>
+            <div className="font-semibold text-[18px] leading-[1.1] tracking-[-0.4px] mt-[14px] relative z-10">
+              Operação &amp; Membros
+            </div>
+            <IllustrationFocusRoom className="absolute left-0 bottom-0 w-full pointer-events-none" />
           </div>
-          <div className="flex items-center gap-[12px]">
-            <span className="w-[24px] h-[24px] rounded-full bg-white text-[#0066FF] flex items-center justify-center text-[11px] font-bold flex-none shadow-sm">
-              2
-            </span>
-            <span>
-              <b className="font-semibold text-white">Coytech Flow</b> — 5 agentes de IA e automações n8n
-            </span>
+
+          <div className="absolute left-[185px] bottom-[60px] w-[210px] h-[280px] bg-[#0066FF] rounded-[14px] p-[18px] text-[#141414] flex flex-col overflow-hidden rotate-[2deg] z-10 shadow-xl">
+            <div className="flex justify-between items-center text-[11px] font-semibold relative z-10">
+              <span className="text-[#141414]/80">02</span>
+              <span className="flex items-center gap-[5px] font-medium bg-black/15 text-[#141414] rounded-full px-[8px] py-[3px] text-[10px]">
+                <span className="w-[5px] h-[5px] rounded-full bg-[#141414]"></span>
+                IA 24h
+              </span>
+            </div>
+            <div className="font-semibold text-[18px] leading-[1.1] tracking-[-0.4px] mt-[14px] relative z-10">
+              Agentes &amp; MCP
+            </div>
+            <IllustrationAiAgents className="absolute left-0 bottom-0 w-full pointer-events-none" />
           </div>
-          <div className="flex items-center gap-[12px]">
-            <span className="w-[24px] h-[24px] rounded-full bg-white text-[#0066FF] flex items-center justify-center text-[11px] font-bold flex-none shadow-sm">
-              3
-            </span>
-            <span>
-              <b className="font-semibold text-white">Coytech Pulse</b> — monitoramento 4 camadas e motor BIA
-            </span>
+
+          <div className="absolute left-[370px] bottom-[25px] w-[210px] h-[280px] bg-[#f4f4f2] rounded-[14px] p-[18px] text-[#141414] flex flex-col overflow-hidden rotate-[9deg]">
+            <div className="flex justify-between items-center text-[11px] font-semibold relative z-10">
+              <span className="text-[#0066FF]">03</span>
+              <span className="flex items-center gap-[5px] font-medium bg-[#e6e5e1] text-[#141414] rounded-full px-[8px] py-[3px] text-[10px]">
+                <span className="w-[5px] h-[5px] rounded-full bg-[#2f9e5a]"></span>
+                Ativo
+              </span>
+            </div>
+            <div className="font-semibold text-[18px] leading-[1.1] tracking-[-0.4px] mt-[14px] relative z-10">
+              Clientes 360º
+            </div>
+            <IllustrationTeamLounge className="absolute left-0 bottom-0 w-full pointer-events-none" />
           </div>
         </div>
-
-        <svg
-          viewBox="0 10 200 140"
-          className="absolute left-[10%] bottom-0 w-[80%] opacity-85"
-          fill="none"
-          stroke="white"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M30 40v14M23 47h14M44 24v8M40 28h8"></path>
-          <path d="M104 56V40"></path>
-          <circle cx="104" cy="35" r="5" fill="#141414"></circle>
-          <rect x="50" y="78" width="10" height="24" rx="4"></rect>
-          <rect x="148" y="78" width="10" height="24" rx="4"></rect>
-          <rect x="60" y="56" width="88" height="70" rx="18" fill="#0066FF"></rect>
-          <rect x="72" y="72" width="64" height="30" rx="15" fill="#141414"></rect>
-          <circle cx="92" cy="87" r="5" fill="#0066FF" stroke="none"></circle>
-          <circle cx="116" cy="87" r="5" fill="#0066FF" stroke="none"></circle>
-          <path d="M96 112c5 4 11 4 16 0"></path>
-          <path d="M52 152C56 138 68 132 84 132H124C140 132 152 138 156 152" fill="#0066FF"></path>
-          <path d="M104 132V152M90 140h28"></path>
-          <rect x="140" y="14" width="54" height="30" rx="10" fill="#f4f4f2"></rect>
-          <path d="M150 44 146 54 160 44"></path>
-          <circle cx="156" cy="29" r="2.5" fill="#141414" stroke="none"></circle>
-          <circle cx="167" cy="29" r="2.5" fill="#141414" stroke="none"></circle>
-          <circle cx="178" cy="29" r="2.5" fill="#141414" stroke="none"></circle>
-        </svg>
       </div>
     </div>
   )
 }
-
