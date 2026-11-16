@@ -1,7 +1,7 @@
 ---
+trigger: always_on
 description: Obriga todo agente a atualizar o arquivo MEMORY.md e TASKS.md logo após implementar qualquer funcionalidade ou alteração.
-globs: ["**/*"]
-always_on: true
+globs: "**/*"
 ---
 
 # 🚨 Atualização Obrigatória da Memória do Projeto (`MEMORY.md`)
