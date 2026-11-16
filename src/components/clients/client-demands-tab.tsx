@@ -201,11 +201,10 @@ export function ClientDemandsTab({ client }: ClientDemandsTabProps) {
             <button
               type="button"
               onClick={() => setViewMode('cards')}
-              className={`px-3 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                viewMode === 'cards'
-                  ? 'bg-[var(--color-brand-blue)] text-white'
-                  : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
-              }`}
+              className={`px-3 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${viewMode === 'cards'
+                ? 'bg-[var(--color-brand-blue)] text-white'
+                : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
+                }`}
             >
               <ListIcon className="w-3.5 h-3.5" />
               <span>Lista de Tarefas</span>
@@ -213,11 +212,10 @@ export function ClientDemandsTab({ client }: ClientDemandsTabProps) {
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                viewMode === 'kanban'
-                  ? 'bg-[var(--color-brand-blue)] text-white'
-                  : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
-              }`}
+              className={`px-3 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${viewMode === 'kanban'
+                ? 'bg-[var(--color-brand-blue)] text-white'
+                : 'text-[var(--ds-muted)] hover:text-[var(--fg)]'
+                }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Kanban Embutido</span>
@@ -284,22 +282,20 @@ export function ClientDemandsTab({ client }: ClientDemandsTabProps) {
                       e.stopPropagation()
                       handleToggleTaskStatus(task)
                     }}
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-                      isDone
-                        ? 'bg-[#2F9E5A] border-[#2F9E5A] text-white'
-                        : 'border-[var(--line2)] group-hover:border-[#0066FF] text-transparent hover:text-[var(--ds-muted)]'
-                    }`}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 cursor-pointer ${isDone
+                      ? 'bg-[#2F9E5A] border-[#2F9E5A] text-white'
+                      : 'border-[var(--line2)] group-hover:border-[#0066FF] text-transparent hover:text-[var(--ds-muted)]'
+                      }`}
                     title={isDone ? 'Marcar como A Fazer' : 'Marcar como Concluída'}
                   >
                     <Check className="w-3 h-3 stroke-[3]" />
                   </button>
 
                   <span
-                    className={`text-[13px] font-medium truncate transition-colors ${
-                      isDone
-                        ? 'line-through text-[var(--ds-muted)]'
-                        : 'text-[var(--fg)] group-hover:text-[#0066FF]'
-                    }`}
+                    className={`text-[13px] font-medium truncate transition-colors ${isDone
+                      ? 'line-through text-[var(--ds-muted)]'
+                      : 'text-[var(--fg)] group-hover:text-[#0066FF]'
+                      }`}
                   >
                     {task.title}
                   </span>

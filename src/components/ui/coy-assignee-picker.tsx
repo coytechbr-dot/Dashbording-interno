@@ -49,9 +49,11 @@ export interface CoyAssigneePickerProps {
   disabled?: boolean
   /** Alinhamento do minipop */
   align?: 'start' | 'center' | 'end'
+  /** Estilo de trigger: 'default' | 'avatars-only' | 'compact' */
+  variant?: 'default' | 'avatars-only' | 'compact'
 }
 
-function getInitials(name?: string | null): string {
+export function getInitials(name?: string | null): string {
   if (!name) return '?'
   const parts = name.trim().split(' ').filter(Boolean)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
@@ -59,7 +61,7 @@ function getInitials(name?: string | null): string {
 }
 
 // Cores de gradiente rotativas para avatares elegantes
-const AVATAR_COLORS = [
+export const AVATAR_COLORS = [
   'from-[#0066FF] to-[#0052CC]',
   'from-[#2F9E5A] to-[#10B981]',
   'from-[#8F7DFF] to-[#6366F1]',
@@ -68,7 +70,7 @@ const AVATAR_COLORS = [
   'from-[#EC4899] to-[#D946EF]',
 ]
 
-function getAvatarGradient(name: string): string {
+export function getAvatarGradient(name: string): string {
   let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
@@ -87,6 +89,7 @@ export function CoyAssigneePicker({
   className = '',
   disabled = false,
   align = 'start',
+  variant = 'default',
 }: CoyAssigneePickerProps) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -154,18 +157,29 @@ export function CoyAssigneePicker({
     return [String(value).trim()]
   }, [value])
 
-  // Filtro de busca por nome, cargo ou setor
+  // Filtro de busca por nome, cargo ou setor + selecionados no topo da lista
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return allUsers
-    const q = searchQuery.toLowerCase().trim()
-    return allUsers.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        (u.jobTitle && u.jobTitle.toLowerCase().includes(q)) ||
-        (u.sector && u.sector.toLowerCase().includes(q)) ||
-        (u.email && u.email.toLowerCase().includes(q))
-    )
-  }, [allUsers, searchQuery])
+    let list = allUsers
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = allUsers.filter(
+        (u) =>
+          u.name.toLowerCase().includes(q) ||
+          (u.jobTitle && u.jobTitle.toLowerCase().includes(q)) ||
+          (u.sector && u.sector.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q))
+      )
+    }
+
+    // OS PERFIS SELECIONADOS SEMPRE FICAM NO TOPO DA LISTA (Solicitação do usuário)
+    return [...list].sort((a, b) => {
+      const aSel = selectedList.some((s) => s.toLowerCase() === a.name.toLowerCase())
+      const bSel = selectedList.some((s) => s.toLowerCase() === b.name.toLowerCase())
+      if (aSel && !bSel) return -1
+      if (!aSel && bSel) return 1
+      return a.name.localeCompare(b.name)
+    })
+  }, [allUsers, searchQuery, selectedList])
 
   // Alternar ou selecionar membro
   const handleToggleMember = (userName: string) => {
@@ -202,60 +216,100 @@ export function CoyAssigneePicker({
     }
   }, [selectedList, allUsers])
 
+  const isReactElement = React.isValidElement(children)
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
+        render={isReactElement ? children : undefined}
+        nativeButton={
+          isReactElement && typeof (children as React.ReactElement).type === 'string'
+            ? (children as React.ReactElement).type === 'button'
+            : undefined
+        }
         className={`outline-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
           children ? '' : 'cursor-pointer'
         } ${className}`}
       >
-        {children ? (
+        {children && !isReactElement ? (
           children
-        ) : multiple ? (
-          /* Trigger Padrão Múltiplo (Avatares + Botão + Atribuir) */
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {selectedList.length > 0 && (
-              <div className="flex -space-x-2 overflow-hidden py-0.5">
-                {selectedList.slice(0, 3).map((name, i) => (
-                  <div
-                    key={i}
-                    className={`h-7 w-7 rounded-full bg-gradient-to-tr ${getAvatarGradient(
-                      name
-                    )} text-white ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm`}
-                    title={name}
-                  >
-                    {getInitials(name)}
-                  </div>
-                ))}
-                {selectedList.length > 3 && (
-                  <div
-                    className="h-7 w-7 rounded-full bg-[var(--line2)] text-[var(--fg)] ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm"
-                    title={`+${selectedList.length - 3} responsáveis`}
-                  >
-                    +{selectedList.length - 3}
-                  </div>
-                )}
-              </div>
-            )}
+        ) : !children ? (
+          variant === 'avatars-only' ? (
+            /* MODO SÓ BOLAS DE PERFIL (AVATARES SOBREPOSTOS) */
+            <div
+              className={`flex items-center -space-x-2 py-0.5 px-1 rounded-full transition-all cursor-pointer hover:opacity-90 ${
+                open ? 'ring-2 ring-[#0066FF]' : ''
+              }`}
+              title={selectedList.length > 0 ? selectedList.join(', ') : 'Atribuir responsável'}
+            >
+              {selectedList.length > 0 ? (
+                <>
+                  {selectedList.slice(0, 3).map((name, i) => (
+                    <div
+                      key={i}
+                      className={`h-7 w-7 rounded-full bg-gradient-to-tr ${getAvatarGradient(
+                        name
+                      )} text-white ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm`}
+                    >
+                      {getInitials(name)}
+                    </div>
+                  ))}
+                  {selectedList.length > 3 && (
+                    <div className="h-7 w-7 rounded-full bg-[var(--line2)] text-[var(--fg)] ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm">
+                      +{selectedList.length - 3}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="h-7 w-7 rounded-full bg-[var(--surface)] border border-dashed border-[var(--line2)] hover:border-[#0066FF] text-[var(--ds-muted)] hover:text-[#0066FF] flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors">
+                  <Plus className="w-3.5 h-3.5" />
+                </div>
+              )}
+            </div>
+          ) : multiple ? (
+            /* Trigger Padrão Múltiplo (Avatares + Pílula Adicionar) */
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {selectedList.length > 0 && (
+                <div className="flex -space-x-2 overflow-hidden py-0.5">
+                  {selectedList.slice(0, 3).map((name, i) => (
+                    <div
+                      key={i}
+                      className={`h-7 w-7 rounded-full bg-gradient-to-tr ${getAvatarGradient(
+                        name
+                      )} text-white ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm`}
+                      title={name}
+                    >
+                      {getInitials(name)}
+                    </div>
+                  ))}
+                  {selectedList.length > 3 && (
+                    <div
+                      className="h-7 w-7 rounded-full bg-[var(--line2)] text-[var(--fg)] ring-2 ring-[var(--surface)] flex items-center justify-center text-[10px] font-bold shrink-0 select-none shadow-sm"
+                      title={`+${selectedList.length - 3} responsáveis`}
+                    >
+                      +{selectedList.length - 3}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <button
-              type="button"
-              className={`h-[32px] px-2.5 rounded-lg border border-[var(--line2)] hover:border-[#0066FF] hover:bg-[#0066FF]/10 text-[11.5px] font-medium text-[var(--ds-muted)] hover:text-[#0066FF] flex items-center gap-1.5 transition-colors cursor-pointer ${
-                open ? 'border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]' : ''
+              <span
+                className={`h-[32px] px-2.5 rounded-lg border border-[var(--line2)] hover:border-[#0066FF] hover:bg-[#0066FF]/10 text-[11.5px] font-medium text-[var(--ds-muted)] hover:text-[#0066FF] flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  open ? 'border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]' : ''
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5 text-[#0066FF]" />
+                <span>{selectedList.length === 0 ? 'Atribuir responsável' : 'Adicionar'}</span>
+              </span>
+            </div>
+          ) : (
+            /* Trigger Padrão Único (Pílula com Foto, Nome e Chevron) */
+            <div
+              className={`h-[38px] px-3 rounded-xl bg-[var(--surface)] border border-[var(--line2)] text-[12.5px] text-[var(--fg)] flex items-center justify-between gap-2.5 hover:border-[#0066FF]/60 hover:bg-[var(--ds-hover)] transition-all ${
+                open ? 'border-[#0066FF] ring-2 ring-[#0066FF]/15' : ''
               }`}
             >
-              <Plus className="w-3.5 h-3.5 text-[#0066FF]" />
-              <span>{selectedList.length === 0 ? 'Atribuir responsável' : 'Adicionar'}</span>
-            </button>
-          </div>
-        ) : (
-          /* Trigger Padrão Único (Pílula com Foto, Nome e Chevron) */
-          <div
-            className={`h-[38px] px-3 rounded-xl bg-[var(--surface)] border border-[var(--line2)] text-[12.5px] text-[var(--fg)] flex items-center justify-between gap-2.5 hover:border-[#0066FF]/60 hover:bg-[var(--ds-hover)] transition-all ${
-              open ? 'border-[#0066FF] ring-2 ring-[#0066FF]/15' : ''
-            }`}
-          >
             <div className="flex items-center gap-2 min-w-0 truncate">
               {singleSelectedUser ? (
                 <>
@@ -280,7 +334,8 @@ export function CoyAssigneePicker({
 
             <ChevronDown className="w-3.5 h-3.5 text-[var(--ds-muted)] shrink-0" />
           </div>
-        )}
+          )
+        ) : null}
       </PopoverTrigger>
 
       {/* MINIPOP COM LISTA DE USUÁRIOS, FOTO, NOME E CARGO */}
@@ -396,3 +451,4 @@ export function CoyAssigneePicker({
     </Popover>
   )
 }
+

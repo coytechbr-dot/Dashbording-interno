@@ -366,3 +366,30 @@
   - Botão de solicitar proposta integrado na gaveta de chat ativa (`activeConv`), no modal de detalhes do lead, nos cards do Kanban e na tabela CRM em `/atendimento`, e no card de negócios (`DealCard`) em `/comercial`.
 - [x] **TASK-16.6 — Governança RBAC e Validação TypeScript:**
   - Inclusão das permissões `clients.create_order_service`, `clients.view_demands_kanban` e `leads.request_commercial_proposal` em `spec/coydash_funcionalidades_e_permissoes.md`, `src/lib/access-control.ts` e validação com `npx tsc --noEmit` (0 erros).
+
+---
+
+## ⚡ FASE 17 — Reestruturação de Projetos & Tarefas, Exclusão Segura com Digitação do Nome, Mover/Copiar Tarefas & Subtarefas, e Tabela Comercial ClickUp
+**Tese:** Elevar a experiência de navegação, governança e produtividade no módulo de tarefas e projetos com reordenação de listas, proteção crítica contra exclusões acidentais, movimentação e conversão fluida entre tarefas e subtarefas, ações rápidas no card (status e comentários sem abrir modal) e tabela com colunas personalizáveis estilo ClickUp.
+
+- [x] **TASK-17.1 — Nomes Completos no Hover & Renomeação para "Projetos & Tarefas":**
+  - Tooltip/Hover nativo (`title`) em todas as pastas e listas no menu lateral para não truncar nomes longos.
+  - Renomeação consistente de "Setores e Projetos" para "Projetos & Tarefas" na Sidebar (`coydash-shell.tsx`) e breadcrumbs (`tasks-workspace-view.tsx`).
+- [x] **TASK-17.2 — Exclusão Protegida de Projetos e Listas (`ConfirmDeleteModal`):**
+  - Modal de segurança destrutiva exigindo digitação exata do nome do item para destravar a exclusão, restrito a perfis com permissão `tasks.manage_structure`.
+- [x] **TASK-17.3 — Mover e Copiar Tarefas e Subtarefas (`TaskMoveCopyModal`):**
+  - Mover tarefas entre listas de qualquer projeto, copiar/duplicar tarefas preservando dados e subtarefas, converter tarefas normais em subtarefas e promover subtarefas existentes para tarefas principais.
+- [x] **TASK-17.4 — Responsáveis em Bolhas Circulares no Título e Ordenação:**
+  - `CoyAssigneePicker` com variante `avatars-only` posicionado colado ao lado direito do título no `TaskDialog`, com membros selecionados priorizados no topo da lista ao abrir o popover.
+- [x] **TASK-17.5 — Reordenação e Movimentação de Listas entre Projetos:**
+  - Setas subir/descer na barra lateral para reordenar listas dentro do projeto com persistência de ordem, e seletor de projeto no modal de edição de listas.
+- [x] **TASK-17.6 — Gestão Rápida de Subtarefas:**
+  - Troca de status rápida com 1 clique direto na lista de subtarefas da tarefa e exclusão com popover de confirmação de aviso.
+- [x] **TASK-17.7 — Reposicionamento do "Modo Eu" & Busca de Tarefas:**
+  - Botão "Modo Eu" alinhado à direita na barra de filtros (`ml-auto`) e campo de pesquisa em tempo real de tarefas no workspace.
+- [x] **TASK-17.8 — Menu de 3 Pontos no Card e Status/Comentários Rápidos:**
+  - Popover de 3 pontos no card com ações completas (Copiar ID, Favoritos, Mover/Copiar, Arquivar, Remover com confirmação).
+  - Pílula de status clicável no card (`TaskQuickStatusPopover`) e visualização/envio de comentários sem entrar na tarefa (`TaskQuickCommentsPopover`).
+- [x] **TASK-17.9 — Tabela de Tarefas Estilo Comercial / ClickUp com Seletor de Colunas:**
+  - Novo layout em tabela escura com colunas estruturadas, avatares em bolhas sobrepostas, subtarefas expansíveis e botão "+ Campos / Colunas" no canto superior direito com minibalão de busca para alternar visibilidade de colunas padrão e campos personalizados.
+

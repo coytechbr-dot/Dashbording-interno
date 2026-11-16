@@ -49,6 +49,7 @@ import { AudioRecorder } from './audio-recorder'
 import { AudioPlayer } from './audio-player'
 import { TaskCustomFields } from './task-custom-fields'
 import { CoyAssigneePicker } from '@/components/ui/coy-assignee-picker'
+import { AutoLinkText } from '@/components/ui/auto-link-text'
 import { useCoyDash } from '@/lib/coydash-store'
 import {
   canUserDeleteTask,
@@ -878,11 +879,10 @@ export function TaskDialog({
             ? { width: '98vw', maxWidth: '1880px' }
             : { width: '88vw', maxWidth: '1600px' }
         }
-        className={`bg-[var(--surface)] text-[var(--fg)] border-[var(--line2)] p-0 flex flex-col gap-0 rounded-[20px] shadow-2xl overflow-hidden ${
-          isFullscreen
-            ? '!w-[98vw] !max-w-[1880px] h-[96vh]'
-            : '!w-[88vw] !max-w-[1600px] sm:!max-w-[1600px] h-[92vh] max-h-[960px]'
-        }`}
+        className={`bg-[var(--surface)] text-[var(--fg)] border-[var(--line2)] p-0 flex flex-col gap-0 rounded-[20px] shadow-2xl overflow-hidden ${isFullscreen
+          ? '!w-[98vw] !max-w-[1880px] h-[96vh]'
+          : '!w-[88vw] !max-w-[1600px] sm:!max-w-[1600px] h-[92vh] max-h-[960px]'
+          }`}
       >
         <DialogTitle className="sr-only">
           {activeTask ? `Editar tarefa: ${activeTask.title}` : 'Nova tarefa'}
@@ -1173,9 +1173,8 @@ export function TaskDialog({
                               key={st.id}
                               type="button"
                               onClick={() => handleSelectStatus(st.name)}
-                              className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[11.5px] font-bold uppercase text-left transition-colors cursor-pointer ${
-                                active ? 'bg-[var(--line2)]/80' : 'hover:bg-[var(--line2)]/50'
-                              }`}
+                              className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[11.5px] font-bold uppercase text-left transition-colors cursor-pointer ${active ? 'bg-[var(--line2)]/80' : 'hover:bg-[var(--line2)]/50'
+                                }`}
                             >
                               <span className="flex items-center gap-2" style={{ color: st.color }}>
                                 <span
@@ -1195,11 +1194,10 @@ export function TaskDialog({
                   <button
                     type="button"
                     onClick={handleToggleCompleted}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                      isDoneStatusName(statusKey)
-                        ? 'text-emerald-500 bg-emerald-500/10'
-                        : 'text-[var(--ds-muted)] hover:bg-[var(--line2)] hover:text-emerald-500'
-                    }`}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDoneStatusName(statusKey)
+                      ? 'text-emerald-500 bg-emerald-500/10'
+                      : 'text-[var(--ds-muted)] hover:bg-[var(--line2)] hover:text-emerald-500'
+                      }`}
                     title="Alternar conclusão"
                   >
                     <CheckCircle2 className="w-4 h-4" />
@@ -1402,11 +1400,10 @@ export function TaskDialog({
                         })
                       }
                     }}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      isTrackingTime
-                        ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/30 animate-pulse'
-                        : 'bg-[var(--line2)] hover:bg-[var(--line)] text-[var(--fg)]'
-                    }`}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${isTrackingTime
+                      ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/30 animate-pulse'
+                      : 'bg-[var(--line2)] hover:bg-[var(--line)] text-[var(--fg)]'
+                      }`}
                   >
                     {isTrackingTime ? (
                       <>
@@ -1452,9 +1449,8 @@ export function TaskDialog({
                         <button
                           type="button"
                           onClick={() => handleSelectClient('')}
-                          className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[12px] text-left hover:bg-[var(--line2)]/60 cursor-pointer ${
-                            !targetClientId ? 'bg-[var(--line2)]/70 font-semibold' : 'text-[var(--ds-muted)]'
-                          }`}
+                          className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[12px] text-left hover:bg-[var(--line2)]/60 cursor-pointer ${!targetClientId ? 'bg-[var(--line2)]/70 font-semibold' : 'text-[var(--ds-muted)]'
+                            }`}
                         >
                           <span>Sem cliente</span>
                           {!targetClientId && <Check className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />}
@@ -1464,9 +1460,8 @@ export function TaskDialog({
                             key={c.id}
                             type="button"
                             onClick={() => handleSelectClient(c.id)}
-                            className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[12px] text-left hover:bg-[var(--line2)]/60 cursor-pointer ${
-                              targetClientId === c.id ? 'bg-[var(--color-brand-blue)]/10 font-semibold' : ''
-                            }`}
+                            className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-[12px] text-left hover:bg-[var(--line2)]/60 cursor-pointer ${targetClientId === c.id ? 'bg-[var(--color-brand-blue)]/10 font-semibold' : ''
+                              }`}
                           >
                             <span className="truncate">{c.name}</span>
                             {targetClientId === c.id && (
@@ -1567,9 +1562,9 @@ export function TaskDialog({
                           ? sub.assignees
                           : sub.assignee_name
                             ? sub.assignee_name
-                                .split(',')
-                                .map((s) => s.trim())
-                                .filter(Boolean)
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter(Boolean)
                             : []
 
                       return (
@@ -1601,11 +1596,10 @@ export function TaskDialog({
                             </button>
 
                             <span
-                              className={`text-[12.5px] font-medium truncate ${
-                                subDone
-                                  ? 'line-through text-[var(--ds-muted)]'
-                                  : 'text-[var(--fg)] group-hover:text-[var(--color-brand-blue)]'
-                              }`}
+                              className={`text-[12.5px] font-medium truncate ${subDone
+                                ? 'line-through text-[var(--ds-muted)]'
+                                : 'text-[var(--fg)] group-hover:text-[var(--color-brand-blue)]'
+                                }`}
                             >
                               {sub.title}
                             </span>
@@ -1748,11 +1742,10 @@ export function TaskDialog({
                 render={
                   <button
                     type="button"
-                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                      links.length > 0
-                        ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
-                        : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
-                    }`}
+                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${links.length > 0
+                      ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
+                      : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
+                      }`}
                     title="Links de Referência"
                   />
                 }
@@ -1832,11 +1825,10 @@ export function TaskDialog({
                 render={
                   <button
                     type="button"
-                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                      attachments.length > 0
-                        ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
-                        : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
-                    }`}
+                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${attachments.length > 0
+                      ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
+                      : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
+                      }`}
                     title="Anexos"
                   />
                 }
@@ -1889,11 +1881,10 @@ export function TaskDialog({
                 render={
                   <button
                     type="button"
-                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                      linkedTaskIds.length > 0
-                        ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
-                        : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
-                    }`}
+                    className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${linkedTaskIds.length > 0
+                      ? 'bg-[var(--color-brand-blue)]/15 text-[var(--color-brand-blue)]'
+                      : 'text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)]'
+                      }`}
                     title="Tarefas Vinculadas"
                   />
                 }
@@ -1935,9 +1926,9 @@ export function TaskDialog({
           </div>
 
           {/* ========================================================================= */}
-          {/* COLUNA 3: PAINEL DE COMENTÁRIOS & ATIVIDADES */}
+          {/* COLUNA 3: PAINEL DE COMENTÁRIOS & ATIVIDADES (LARGURA PADRONIZADA EM 380px) */}
           {/* ========================================================================= */}
-          <div className="w-[300px] min-w-[270px] max-w-[320px] shrink-0 bg-[var(--surface)] flex flex-col justify-between overflow-hidden">
+          <div className="w-[380px] min-w-[360px] max-w-[400px] shrink-0 bg-[var(--surface)] flex flex-col justify-between overflow-hidden border-l border-[var(--line2)]">
             <div className="p-3.5 border-b border-[var(--line2)] flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1965,7 +1956,7 @@ export function TaskDialog({
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-w-0">
               <div className="text-center py-1">
                 <span className="text-[10px] text-[var(--ds-muted)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--line2)]">
                   {activeTask ? `Criada em ${activeTask.created_at || 'recente'}` : 'Criando tarefa'}
@@ -1982,22 +1973,22 @@ export function TaskDialog({
               {filteredComments.map((comm) => (
                 <div
                   key={comm.id}
-                  className="flex flex-col gap-1.5 p-3 rounded-xl bg-[var(--bg)] border border-[var(--line2)] shadow-sm"
+                  className="flex flex-col gap-1.5 p-3 rounded-xl bg-[var(--bg)] border border-[var(--line2)] shadow-sm max-w-full overflow-hidden break-words [overflow-wrap:anywhere] [word-break:break-word]"
                 >
                   <div className="flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full bg-[var(--color-brand-blue)]/20 text-[var(--color-brand-blue)] font-bold text-[9px] flex items-center justify-center">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-5 h-5 rounded-full bg-[var(--color-brand-blue)]/20 text-[var(--color-brand-blue)] font-bold text-[9px] flex items-center justify-center shrink-0">
                         {getInitials(comm.author_name)}
                       </div>
-                      <span className="font-semibold text-[var(--fg)]">{comm.author_name}</span>
+                      <span className="font-semibold text-[var(--fg)] truncate">{comm.author_name}</span>
                     </div>
-                    <span className="text-[10px] text-[var(--ds-muted)]">
+                    <span className="text-[10px] text-[var(--ds-muted)] shrink-0">
                       {comm.created_at ? format(new Date(comm.created_at), 'HH:mm') : ''}
                     </span>
                   </div>
 
-                  <p className="text-[12px] text-[var(--fg)] whitespace-pre-wrap leading-relaxed">
-                    {comm.content}
+                  <p className="text-[12px] text-[var(--fg)] whitespace-pre-wrap leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] max-w-full">
+                    <AutoLinkText text={comm.content} />
                   </p>
 
                   {comm.audio_url && (
@@ -2026,7 +2017,7 @@ export function TaskDialog({
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
-                  <AudioRecorder onRecordingComplete={(b) => void handleAudioComplete(b)} onClear={() => {}} />
+                  <AudioRecorder onRecordingComplete={(b) => void handleAudioComplete(b)} onClear={() => { }} />
                   <label className="p-1.5 hover:bg-[var(--line2)] rounded text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer">
                     <Paperclip className="w-3.5 h-3.5" />
                     <input type="file" multiple className="hidden" onChange={handleFileChange} />

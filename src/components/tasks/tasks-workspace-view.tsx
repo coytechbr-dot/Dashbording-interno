@@ -25,14 +25,35 @@ import {
   Users,
   Building2,
   Flag,
+  Search,
+  MoreVertical,
+  Copy,
+  Star,
+  ArrowRightLeft,
+  Columns,
+  ExternalLink,
+  Calendar,
+  MessageSquare,
+  Check,
 } from 'lucide-react'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { CoyDropdown, type CoyDropdownOption } from '@/components/ui/coy-dropdown'
 import { CoyColorPicker } from '@/components/ui/coy-color-picker'
+import { CoyIconPickerPopover, CoyIconRenderer } from '@/components/ui/coy-icon-picker'
 import { useCoyDash } from '@/lib/coydash-store'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import { CustomFieldsStudioDialog } from './custom-fields-studio-dialog'
-import type { TaskItem } from '@/types/coydash'
+import { TaskQuickStatusPopover } from './task-quick-status-popover'
+import { TaskQuickCommentsPopover } from './task-quick-comments-popover'
+import { TaskMoveCopyModal } from './task-move-copy-modal'
+import { AutoLinkText } from '@/components/ui/auto-link-text'
+import { CoyAssigneePicker, getAvatarGradient, getInitials } from '@/components/ui/coy-assignee-picker'
+import type { TaskItem, TaskPriorityLevel } from '@/types/coydash'
 import { isTaskAssignedToUser } from '@/lib/task-utils'
 import {
   hasFeaturePermission,
@@ -57,12 +78,15 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     orgMembers,
     currentUserPermissions,
     createTaskFolder,
+    updateTaskList,
     createTaskStatus,
     deleteTaskStatusColumn,
     createTask,
     updateTask,
     archiveTask,
     deleteTask,
+    addTaskComment,
+    customFieldDefs = [],
     searchQuery,
     authenticatedUser,
   } = useCoyDash()
@@ -91,6 +115,10 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     () => hasFeaturePermission(userPermCtx, 'custom_fields.manage'),
     [userPermCtx]
   )
+  const canManageStructure = useMemo(
+    () => hasFeaturePermission(userPermCtx, 'tasks.manage_structure'),
+    [userPermCtx]
+  )
 
   const [expandedListRows, setExpandedListRows] = useState<Record<string, boolean>>({})
   const [showArchived, setShowArchived] = useState(false)
@@ -100,6 +128,72 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
   const [selectedListFilter, setSelectedListFilter] = useState<string>(listId || 'ALL')
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>('ALL')
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('ALL')
+
+  // Filtro de pesquisa de tarefas interna na tela (Item 8)
+  const [taskSearchQuery, setTaskSearchQuery] = useState('')
+
+  // Configuração e persistência de colunas visíveis da tabela (Item 12 estilo ClickUp)
+  const [columnsPopoverOpen, setColumnsPopoverOpen] = useState(false)
+  const [colSearchQuery, setColSearchQuery] = useState('')
+  const [visibleCols, setVisibleCols] = useState<{
+    client: boolean
+    status: boolean
+    priority: boolean
+    assignees: boolean
+    dueDate: boolean
+    subtasks: boolean
+    comments: boolean
+    customFieldIds: string[]
+  }>({
+    client: true,
+    status: true,
+    priority: true,
+    assignees: true,
+    dueDate: true,
+    subtasks: true,
+    comments: true,
+    customFieldIds: [],
+  })
+
+  // Carregar colunas visíveis salvas
+  useEffect(() => {
+    try {
+      const storageKey = `coydash_list_cols_${listId || 'global'}`
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setVisibleCols((prev) => ({ ...prev, ...parsed }))
+      }
+    } catch {}
+  }, [listId])
+
+  const toggleColumnVisibility = (key: keyof Omit<typeof visibleCols, 'customFieldIds'>) => {
+    setVisibleCols((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      try {
+        localStorage.setItem(`coydash_list_cols_${listId || 'global'}`, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const toggleCustomFieldCol = (fieldId: string) => {
+    setVisibleCols((prev) => {
+      const exists = prev.customFieldIds.includes(fieldId)
+      const nextIds = exists
+        ? prev.customFieldIds.filter((id) => id !== fieldId)
+        : [...prev.customFieldIds, fieldId]
+      const next = { ...prev, customFieldIds: nextIds }
+      try {
+        localStorage.setItem(`coydash_list_cols_${listId || 'global'}`, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  // Modal de mover/copiar tarefa da tabela ou card
+  const [moveCopyTask, setMoveCopyTask] = useState<TaskItem | null>(null)
+  const [subtaskToDeleteId, setSubtaskToDeleteId] = useState<string | null>(null)
 
   // Filtro "Modo Eu" (ClickUp Me Mode) - MARCADO POR PADRÃO (true)
   const [isMeMode, setIsMeMode] = useState<boolean>(true)
@@ -160,7 +254,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
   }, [tasks])
 
   const filteredTasks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
+    const q = (taskSearchQuery || searchQuery).trim().toLowerCase()
     return tasks.filter((t) => {
       // Subtarefas ficam agrupadas dentro da tarefa pai no Kanban (+ X subtarefas) e na expansão da Lista
       if (t.parent_task_id) return false
@@ -213,6 +307,7 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
     selectedPriorityFilter,
     selectedClientFilter,
     searchQuery,
+    taskSearchQuery,
     isMeMode,
     authenticatedUser,
     showArchived,
@@ -274,16 +369,24 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
 
     taskLists.forEach((l) => {
       const taskCount = tasks.filter((t) => t.list_id === l.id && !t.parent_task_id && !t.is_archived).length
-      let icon = <FolderKanban className="w-3.5 h-3.5 text-[var(--color-brand-blue)]" />
-      const nameLower = l.name.toLowerCase()
-      if (nameLower.includes('fase')) {
-        icon = <Milestone className="w-3.5 h-3.5 text-blue-400" />
-      } else if (nameLower.includes('meta') || nameLower.includes('google') || nameLower.includes('tráfego') || nameLower.includes('ads')) {
-        icon = <Globe className="w-3.5 h-3.5 text-cyan-400" />
-      } else if (nameLower.includes('canva') || nameLower.includes('criativo') || nameLower.includes('brand') || nameLower.includes('design')) {
-        icon = <Palette className="w-3.5 h-3.5 text-indigo-400" />
-      } else if (nameLower.includes('kickoff') || nameLower.includes('implantação')) {
-        icon = <Rocket className="w-3.5 h-3.5 text-emerald-400" />
+      let icon = (
+        <CoyIconRenderer
+          icon={l.icon}
+          fallback={FolderKanban}
+          className="w-3.5 h-3.5 text-[var(--color-brand-blue)]"
+        />
+      )
+      if (!l.icon || l.icon === 'List') {
+        const nameLower = l.name.toLowerCase()
+        if (nameLower.includes('fase')) {
+          icon = <Milestone className="w-3.5 h-3.5 text-blue-400" />
+        } else if (nameLower.includes('meta') || nameLower.includes('google') || nameLower.includes('tráfego') || nameLower.includes('ads')) {
+          icon = <Globe className="w-3.5 h-3.5 text-cyan-400" />
+        } else if (nameLower.includes('canva') || nameLower.includes('criativo') || nameLower.includes('brand') || nameLower.includes('design')) {
+          icon = <Palette className="w-3.5 h-3.5 text-indigo-400" />
+        } else if (nameLower.includes('kickoff') || nameLower.includes('implantação')) {
+          icon = <Rocket className="w-3.5 h-3.5 text-emerald-400" />
+        }
       }
 
       listOpts.push({
@@ -480,19 +583,49 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
       <div className="flex flex-wrap items-center justify-between gap-[14px]">
         <div>
           <div className="flex items-center gap-[8px] text-[11.5px] text-[var(--ds-muted)]">
-            <span>Setores & Projetos</span>
+            <span>Projetos & Tarefas</span>
             {activeFolderObj && (
               <>
                 <span>/</span>
-                <span className="text-[var(--color-brand-blue)] font-semibold">
+                <span className="text-[var(--ds-muted)]">
                   {activeFolderObj.name}
                 </span>
               </>
             )}
+            {activeListObj && (
+              <>
+                <span>/</span>
+                <span className="text-[var(--color-brand-blue)] font-semibold">
+                  {activeListObj.name}
+                </span>
+              </>
+            )}
+            {!activeFolderObj && !activeListObj && (
+              <>
+                <span>/</span>
+                <span className="text-[var(--color-brand-blue)] font-semibold">
+                  Minhas Tarefas
+                </span>
+              </>
+            )}
           </div>
-          <h1 className="text-[26px] font-bold tracking-[-0.5px]">
-            {activeListObj ? activeListObj.name : isMeMode ? 'Minhas Tarefas' : 'Todas as Tarefas'}
-          </h1>
+          <div className="flex items-center gap-[10px]">
+            {activeListObj && (
+              <CoyIconPickerPopover
+                currentIcon={activeListObj.icon}
+                defaultIcon="List"
+                disabled={!canManageStructure}
+                title={`Ícone de ${activeListObj.name}`}
+                onSelect={async (newIcon) => {
+                  await updateTaskList(activeListObj.id, activeListObj.name, newIcon, activeListObj.folder_id)
+                }}
+                triggerClassName="w-8 h-8 rounded-[8px] bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] text-[#0066FF] hover:border-[#0066FF] transition-all flex items-center justify-center cursor-pointer shadow-xs"
+              />
+            )}
+            <h1 className="text-[26px] font-bold tracking-[-0.5px]">
+              {activeListObj ? activeListObj.name : isMeMode ? 'Minhas Tarefas' : 'Todas as Tarefas'}
+            </h1>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-[8px]">
@@ -562,48 +695,27 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
 
       {/* BARRA DE FILTROS E BUSCA */}
       <div className="flex flex-wrap items-center gap-[8px]">
-        {/* BOTÃO MODO EU (CLICKUP ME MODE) - MARCADO POR PADRÃO */}
-        <button
-          type="button"
-          onClick={() => setIsMeMode((prev) => !prev)}
-          className={`h-[34px] px-[13px] rounded-full border text-[12px] font-semibold flex items-center gap-[7px] cursor-pointer transition-all select-none ${
-            isMeMode
-              ? 'bg-[var(--color-brand-blue)]/15 border-[var(--color-brand-blue)] text-[var(--color-brand-blue)] shadow-xs'
-              : 'bg-[var(--surface)] hover:bg-[var(--ds-hover)] border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)]'
-          }`}
-          title={
-            isMeMode
-              ? 'Modo Eu ativo: exibindo apenas tarefas atribuídas a você. Clique para desmarcar e ver todas as tarefas com acesso.'
-              : 'Modo Eu desmarcado: exibindo todas as tarefas do projeto/lista com acesso. Clique para filtrar apenas as suas tarefas.'
-          }
-        >
-          <div
-            className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9.5px] font-bold ${
-              isMeMode
-                ? 'bg-[var(--color-brand-blue)] text-white'
-                : 'bg-[var(--bg)] border border-[var(--line2)] text-[var(--ds-muted)]'
-            }`}
-          >
-            {authenticatedUser?.name
-              ? authenticatedUser.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase()
-              : 'EU'}
-          </div>
-          <span>Modo Eu</span>
-          <span
-            className={`px-[6px] py-[1px] rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-              isMeMode
-                ? 'bg-[var(--color-brand-blue)]/20 text-[var(--color-brand-blue)]'
-                : 'bg-[var(--bg)] text-[var(--ds-muted)] border border-[var(--line2)]'
-            }`}
-          >
-            {isMeMode ? 'Ativo' : 'Todos'}
-          </span>
-        </button>
+        {/* PESQUISA DE TAREFAS DENTRO DA LISTA (ITEM 8) */}
+        <div className="relative flex items-center min-w-[210px] max-w-[280px]">
+          <Search className="w-3.5 h-3.5 text-[var(--ds-muted)] absolute left-3 pointer-events-none" />
+          <input
+            type="text"
+            value={taskSearchQuery}
+            onChange={(e) => setTaskSearchQuery(e.target.value)}
+            placeholder="Pesquisar tarefas..."
+            className="w-full h-[34px] pl-8 pr-7 rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[12px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] outline-none focus:border-[#0066FF] transition-colors"
+          />
+          {taskSearchQuery && (
+            <button
+              type="button"
+              onClick={() => setTaskSearchQuery('')}
+              className="absolute right-2.5 text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
+              title="Limpar pesquisa"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
 
         {/* DROPDOWNS CUSTOMIZADOS COM ESTILO PREMIUM E ÍCONES DE TAREFA */}
         {!listId && (
@@ -612,9 +724,9 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
             onChange={setSelectedListFilter}
             options={listDropdownOptions}
             searchable={listDropdownOptions.length > 5}
-            searchPlaceholder="Buscar setor / lista..."
+            searchPlaceholder="Buscar projeto / lista..."
             className="min-w-[190px]"
-            title="Filtrar por Lista ou Setor"
+            title="Filtrar por Lista ou Projeto"
           />
         )}
 
@@ -666,6 +778,49 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
             <span>Criar Setores & Tarefas de Exemplo</span>
           </button>
         )}
+
+        {/* BOTÃO MODO EU NO LADO DIREITO (ITEM 7) */}
+        <button
+          type="button"
+          onClick={() => setIsMeMode((prev) => !prev)}
+          className={`h-[34px] px-[13px] rounded-full border text-[12px] font-semibold flex items-center gap-[7px] cursor-pointer transition-all select-none ml-auto ${
+            isMeMode
+              ? 'bg-[var(--color-brand-blue)]/15 border-[var(--color-brand-blue)] text-[var(--color-brand-blue)] shadow-xs'
+              : 'bg-[var(--surface)] hover:bg-[var(--ds-hover)] border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)]'
+          }`}
+          title={
+            isMeMode
+              ? 'Modo Eu ativo: exibindo apenas tarefas atribuídas a você. Clique para desmarcar e ver todas as tarefas com acesso.'
+              : 'Modo Eu desmarcado: exibindo todas as tarefas do projeto/lista com acesso. Clique para filtrar apenas as suas tarefas.'
+          }
+        >
+          <div
+            className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9.5px] font-bold ${
+              isMeMode
+                ? 'bg-[var(--color-brand-blue)] text-white'
+                : 'bg-[var(--bg)] border border-[var(--line2)] text-[var(--ds-muted)]'
+            }`}
+          >
+            {authenticatedUser?.name
+              ? authenticatedUser.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()
+              : 'EU'}
+          </div>
+          <span>Modo Eu</span>
+          <span
+            className={`px-[6px] py-[1px] rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+              isMeMode
+                ? 'bg-[var(--color-brand-blue)]/20 text-[var(--color-brand-blue)]'
+                : 'bg-[var(--bg)] text-[var(--ds-muted)] border border-[var(--line2)]'
+            }`}
+          >
+            {isMeMode ? 'Ativo' : 'Todos'}
+          </span>
+        </button>
       </div>
 
       {/* QUADRO KANBAN COM DRAG AND DROP E DESIGN SYSTEM ROOMIE OFFICE */}
@@ -746,221 +901,674 @@ export function TasksWorkspaceView({ listId }: { listId?: string }) {
           </div>
         </DragDropContext>
       ) : (
-        /* VISÃO EM LISTA REFINADA */
-        <div className="bg-[var(--surface)] border border-[var(--line2)] rounded-[16px] overflow-hidden">
-          <table className="w-full text-left border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-[var(--line)] text-[11px] uppercase text-[var(--ds-muted)]">
-                <th className="py-[12px] px-[16px]">Tarefa</th>
-                <th className="py-[12px] px-[12px]">Cliente</th>
-                <th className="py-[12px] px-[12px]">Status</th>
-                <th className="py-[12px] px-[12px]">Prioridade</th>
-                <th className="py-[12px] px-[12px]">Responsáveis</th>
-                <th className="py-[12px] px-[12px]">Prazo</th>
-                <th className="py-[12px] px-[12px]">Subtarefas</th>
-                <th className="py-[12px] px-[16px] text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-[var(--ds-muted)]">
-                    Nenhuma tarefa encontrada com os filtros selecionados.
-                  </td>
-                </tr>
-              ) : (
-                filteredTasks.map((t) => {
-                  const childSubs = subtasksByParentId.get(t.id) || []
-                  const totalSub = childSubs.length
-                  const isExpanded = Boolean(expandedListRows[t.id])
-                  const canArchiveRow = canUserArchiveTask(userPermCtx, t)
-                  const canDeleteRow = canUserDeleteTask(userPermCtx, t)
+        /* VISÃO EM LISTA REFINADA ESTILO TABELA COMERCIAL / CLICKUP (ITEM 11 E ITEM 12) */
+        <div className="flex flex-col gap-3">
+          {/* BARRA SUPERIOR DA TABELA: TOTAL DE TAREFAS + BOTÃO ADICIONAR CAMPOS / COLUNAS */}
+          <div className="flex items-center justify-between px-2 select-none">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-bold uppercase tracking-wider text-[var(--ds-muted)]">
+                Tarefas na Lista
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[11px] font-bold text-[#0066FF] tabular-nums">
+                {filteredTasks.length}
+              </span>
+            </div>
 
-                  return (
-                    <React.Fragment key={t.id}>
-                      <tr
-                        onClick={() => handleOpenEditModal(t, 'details')}
-                        className="border-b border-[var(--line)] hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
-                      >
-                        <td className="py-[12px] px-[16px] font-semibold text-[var(--fg)]">
-                          <div className="flex items-center gap-2">
-                            {totalSub > 0 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
-                                }}
-                                className="p-0.5 rounded hover:bg-[var(--line2)] text-[var(--ds-muted)]"
-                                title="Expandir subtarefas"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ChevronRight className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            )}
-                            <span>{t.title}</span>
-                          </div>
-                        </td>
-                        <td className="py-[12px] px-[12px] text-[var(--ds-muted)]">
-                          {t.client_name_snapshot || '—'}
-                        </td>
-                        <td className="py-[12px] px-[12px]">
-                          <span className="px-[8px] py-[2px] rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[11px] font-semibold">
-                            {t.status_key}
-                          </span>
-                        </td>
-                        <td className="py-[12px] px-[12px]">
-                          <span
-                            className={`px-[8px] py-[2px] rounded-[6px] border text-[10.5px] font-bold ${
-                              t.priority === 'urgent'
-                                ? 'bg-red-500/15 text-red-600 border-red-500/30'
-                                : t.priority === 'high'
-                                  ? 'bg-orange-500/15 text-orange-600 border-orange-500/30'
-                                  : t.priority === 'medium'
-                                    ? 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30'
-                                    : 'bg-green-500/15 text-green-600 border-green-500/30'
-                            }`}
-                          >
-                            {t.priority === 'urgent'
-                              ? 'Urgente'
-                              : t.priority === 'high'
-                                ? 'Alta'
-                                : t.priority === 'medium'
-                                  ? 'Média'
-                                  : 'Baixa'}
-                          </span>
-                        </td>
-                        <td className="py-[12px] px-[12px] text-[var(--fg)]">
-                          {t.assignees && t.assignees.length > 0
-                            ? t.assignees.join(', ')
-                            : t.assignee_name || '—'}
-                        </td>
-                        <td className="py-[12px] px-[12px] text-[var(--ds-muted)] font-mono text-[12px]">
-                          {t.due_date || '—'}
-                        </td>
-                        <td className="py-[12px] px-[12px]">
-                          {totalSub > 0 ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--line2)] text-[11px] text-[var(--fg)] font-semibold hover:border-[var(--color-brand-blue)] cursor-pointer"
-                            >
-                              <GitBranch className="w-3 h-3 text-[var(--color-brand-blue)]" />
-                              <span>+ {totalSub} subtarefas</span>
-                            </button>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="py-[12px] px-[16px] text-right">
-                          <div className="inline-flex items-center justify-end gap-1">
-                            {canArchiveRow && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void archiveTask(t.id, !Boolean(t.is_archived))
-                                }}
-                                className="text-[var(--ds-muted)] opacity-55 hover:opacity-100 hover:text-[var(--color-brand-blue)] cursor-pointer p-1 transition-opacity"
-                                title={t.is_archived ? 'Restaurar tarefa' : 'Arquivar tarefa'}
-                              >
-                                {t.is_archived ? (
-                                  <ArchiveRestore className="w-3.5 h-3.5 inline" />
-                                ) : (
-                                  <Archive className="w-3.5 h-3.5 inline" />
-                                )}
-                              </button>
-                            )}
-                            {canDeleteRow && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (confirm('Tem certeza que deseja excluir esta tarefa e suas subtarefas?')) {
-                                    void handleDeleteTask(t.id)
-                                  }
-                                }}
-                                className="text-[var(--ds-muted)] opacity-40 hover:opacity-100 hover:text-red-500 cursor-pointer p-1 transition-opacity"
-                                title="Remover tarefa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 inline" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+            {/* BOTÃO + CAMPOS / COLUNAS ESTILO CLICKUP (ITEM 12) */}
+            <Popover open={columnsPopoverOpen} onOpenChange={setColumnsPopoverOpen}>
+              <PopoverTrigger
+                className="h-[32px] px-3 rounded-full bg-[var(--surface)] hover:bg-[var(--ds-hover)] border border-[var(--line2)] hover:border-[#0066FF]/60 text-[11.5px] font-semibold text-[var(--fg)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs outline-none"
+                title="Personalizar colunas visíveis e adicionar campos personalizados"
+              >
+                <Columns className="w-3.5 h-3.5 text-[#0066FF]" />
+                <span>+ Campos / Colunas</span>
+              </PopoverTrigger>
 
-                      {isExpanded &&
-                        childSubs.map((sub) => {
-                          const canDeleteSub = canUserDeleteTask(userPermCtx, sub)
+              <PopoverContent
+                align="end"
+                className="w-72 p-3 bg-[var(--surface)] border border-[var(--line2)] rounded-2xl shadow-2xl z-50 text-[12px] flex flex-col gap-2.5 animate-in fade-in-0 zoom-in-95 duration-100"
+              >
+                <div className="flex items-center justify-between pb-1.5 border-b border-[var(--line)]">
+                  <span className="font-bold text-[var(--fg)]">Exibir Colunas</span>
+                  <span className="text-[10px] text-[var(--ds-muted)]">Tabela de Tarefas</span>
+                </div>
+
+                {/* Busca no popover */}
+                <div className="relative flex items-center">
+                  <Search className="w-3 h-3 text-[var(--ds-muted)] absolute left-2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={colSearchQuery}
+                    onChange={(e) => setColSearchQuery(e.target.value)}
+                    placeholder="Buscar colunas ou campos..."
+                    className="w-full h-7 pl-7 pr-2 rounded-lg bg-[var(--bg)] border border-[var(--line2)] text-[11px] text-[var(--fg)] placeholder:text-[var(--ds-muted)] outline-none focus:border-[#0066FF]"
+                  />
+                </div>
+
+                {/* Lista de colunas padrão */}
+                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--ds-muted)] mt-1">
+                    Campos Padrões
+                  </span>
+
+                  {[
+                    { key: 'client', label: 'Cliente' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'priority', label: 'Prioridade' },
+                    { key: 'assignees', label: 'Responsáveis' },
+                    { key: 'dueDate', label: 'Prazo' },
+                    { key: 'subtasks', label: 'Subtarefas' },
+                    { key: 'comments', label: 'Comentários' },
+                  ]
+                    .filter((c) =>
+                      colSearchQuery
+                        ? c.label.toLowerCase().includes(colSearchQuery.toLowerCase())
+                        : true
+                    )
+                    .map((col) => {
+                      const isChecked = visibleCols[col.key as keyof typeof visibleCols]
+                      return (
+                        <label
+                          key={col.key}
+                          className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-[var(--line2)]/50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[11.5px] text-[var(--fg)]">{col.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isChecked)}
+                            onChange={() =>
+                              toggleColumnVisibility(
+                                col.key as keyof Omit<typeof visibleCols, 'customFieldIds'>
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-[#0066FF] rounded cursor-pointer"
+                          />
+                        </label>
+                      )
+                    })}
+
+                  {/* Campos personalizados cadastrados */}
+                  {customFieldDefs.length > 0 && (
+                    <>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--ds-muted)] mt-2">
+                        Campos Personalizados
+                      </span>
+                      {customFieldDefs
+                        .filter((cf) =>
+                          colSearchQuery
+                            ? cf.name.toLowerCase().includes(colSearchQuery.toLowerCase())
+                            : true
+                        )
+                        .map((cf) => {
+                          const isChecked = visibleCols.customFieldIds.includes(cf.id)
                           return (
-                          <tr
-                            key={sub.id}
-                            onClick={() => handleOpenEditModal(sub, 'details')}
-                            className="border-b border-[var(--line)] bg-[var(--bg)]/50 hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
-                          >
-                            <td className="py-[10px] pl-[40px] pr-[16px] text-[12.5px] text-[var(--fg)]">
-                              <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-blue)] shrink-0" />
-                                <span>{sub.title}</span>
-                              </div>
-                            </td>
-                            <td className="py-[10px] px-[12px] text-[12px] text-[var(--ds-muted)]">
-                              {sub.client_name_snapshot || '—'}
-                            </td>
-                            <td className="py-[10px] px-[12px]">
-                              <span className="px-[8px] py-[2px] rounded-full bg-[var(--surface)] border border-[var(--line2)] text-[10.5px] font-semibold">
-                                {sub.status_key}
+                            <label
+                              key={cf.id}
+                              className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-[var(--line2)]/50 cursor-pointer transition-colors"
+                            >
+                              <span className="text-[11.5px] text-[var(--fg)] truncate max-w-[170px]">
+                                {cf.name}
                               </span>
-                            </td>
-                            <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
-                              {sub.priority}
-                            </td>
-                            <td className="py-[10px] px-[12px] text-[12px] text-[var(--fg)]">
-                              {sub.assignees && sub.assignees.length > 0
-                                ? sub.assignees.join(', ')
-                                : sub.assignee_name || '—'}
-                            </td>
-                            <td className="py-[10px] px-[12px] text-[var(--ds-muted)] font-mono text-[11.5px]">
-                              {sub.due_date || '—'}
-                            </td>
-                            <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
-                              Subtarefa
-                            </td>
-                            <td className="py-[10px] px-[16px] text-right">
-                              {canDeleteSub && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleCustomFieldCol(cf.id)}
+                                className="w-3.5 h-3.5 accent-[#0066FF] rounded cursor-pointer"
+                              />
+                            </label>
+                          )
+                        })}
+                    </>
+                  )}
+                </div>
+
+                {canManageCustomFields && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setColumnsPopoverOpen(false)
+                      setCustomFieldsStudioOpen(true)
+                    }}
+                    className="w-full mt-1 pt-2 border-t border-[var(--line)] text-center text-[11px] font-bold text-[#0066FF] hover:underline cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Configurar Novos Campos Personalizados</span>
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* TABELA DE TAREFAS DESIGN SYSTEM COYTECH */}
+          <div className="bg-[var(--surface)] border border-[var(--line2)] rounded-[16px] overflow-hidden shadow-xs">
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-[var(--line)] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ds-muted)] bg-[var(--surface)]">
+                  <th className="py-[12px] px-[16px]">Tarefa</th>
+                  {visibleCols.client && <th className="py-[12px] px-[12px]">Cliente</th>}
+                  {visibleCols.status && <th className="py-[12px] px-[12px]">Status</th>}
+                  {visibleCols.priority && <th className="py-[12px] px-[12px]">Prioridade</th>}
+                  {visibleCols.assignees && <th className="py-[12px] px-[12px]">Responsáveis</th>}
+                  {visibleCols.dueDate && <th className="py-[12px] px-[12px]">Prazo</th>}
+                  {visibleCols.subtasks && <th className="py-[12px] px-[12px]">Subtarefas</th>}
+                  {visibleCols.comments && <th className="py-[12px] px-[12px]">Comentários</th>}
+                  {customFieldDefs
+                    .filter((cf) => visibleCols.customFieldIds.includes(cf.id))
+                    .map((cf) => (
+                      <th key={cf.id} className="py-[12px] px-[12px]">
+                        {cf.name}
+                      </th>
+                    ))}
+                  <th className="py-[12px] px-[16px] text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-[var(--ds-muted)] text-[13px]">
+                      Nenhuma tarefa encontrada com os filtros selecionados.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTasks.map((t) => {
+                    const childSubs = subtasksByParentId.get(t.id) || []
+                    const totalSub = childSubs.length
+                    const isExpanded = Boolean(expandedListRows[t.id])
+                    const canArchiveRow = canUserArchiveTask(userPermCtx, t)
+                    const canDeleteRow = canUserDeleteTask(userPermCtx, t)
+
+                    const assigneesList =
+                      t.assignees && t.assignees.length > 0
+                        ? t.assignees
+                        : t.assignee_name
+                          ? t.assignee_name.split(',').map((s) => s.trim()).filter(Boolean)
+                          : []
+
+                    return (
+                      <React.Fragment key={t.id}>
+                        <tr
+                          onClick={() => handleOpenEditModal(t, 'details')}
+                          className="border-b border-[var(--line)] hover:bg-[var(--ds-hover)] cursor-pointer transition-colors group"
+                        >
+                          {/* COLUNA TAREFA */}
+                          <td className="py-[12px] px-[16px] font-semibold text-[var(--fg)]">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {totalSub > 0 ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (confirm('Remover esta subtarefa permanentemente?')) {
-                                      void handleDeleteTask(sub.id)
-                                    }
+                                    setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
                                   }}
-                                  className="text-[var(--ds-muted)] opacity-40 hover:opacity-100 hover:text-red-500 cursor-pointer p-1"
-                                  title="Remover subtarefa"
+                                  className="w-5 h-5 rounded hover:bg-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)] flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                                  title="Expandir ou recolher subtarefas"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 inline" />
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  )}
                                 </button>
+                              ) : (
+                                <span className="w-5 h-5 flex items-center justify-center shrink-0 text-[var(--ds-muted)]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--line2)]" />
+                                </span>
+                              )}
+                              <span className="truncate group-hover:text-[#0066FF] transition-colors">
+                                {t.title}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* COLUNA CLIENTE */}
+                          {visibleCols.client && (
+                            <td className="py-[12px] px-[12px] text-[var(--ds-muted)] text-[12.5px]">
+                              {t.client_name_snapshot ? (
+                                <span className="flex items-center gap-1 truncate max-w-[140px]">
+                                  <Building2 className="w-3 h-3 text-[#0066FF] shrink-0" />
+                                  <span className="truncate">{t.client_name_snapshot}</span>
+                                </span>
+                              ) : (
+                                '—'
                               )}
                             </td>
-                          </tr>
-                          )
-                        })}
-                    </React.Fragment>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                          )}
+
+                          {/* COLUNA STATUS CLICÁVEL RÁPIDO (ITEM 10 E 11) */}
+                          {visibleCols.status && (
+                            <td className="py-[12px] px-[12px]">
+                              <TaskQuickStatusPopover
+                                currentStatus={t.status_key || 'A Fazer'}
+                                availableStatuses={columns}
+                                onSelectStatus={async (newStatus) => {
+                                  await updateTask(t.id, { status_key: newStatus })
+                                }}
+                              />
+                            </td>
+                          )}
+
+                          {/* COLUNA PRIORIDADE */}
+                          {visibleCols.priority && (
+                            <td className="py-[12px] px-[12px]">
+                              <Popover>
+                                <PopoverTrigger
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="outline-none cursor-pointer"
+                                  title="Alterar prioridade"
+                                >
+                                  <span
+                                    className={`px-[8px] py-[2px] rounded-[6px] border text-[10.5px] font-bold transition-transform active:scale-95 ${
+                                      t.priority === 'urgent'
+                                        ? 'bg-red-500/15 text-red-500 border-red-500/30'
+                                        : t.priority === 'high'
+                                          ? 'bg-orange-500/15 text-orange-500 border-orange-500/30'
+                                          : t.priority === 'medium'
+                                            ? 'bg-yellow-500/15 text-yellow-500 border-yellow-500/30'
+                                            : 'bg-green-500/15 text-green-500 border-green-500/30'
+                                    }`}
+                                  >
+                                    {t.priority === 'urgent'
+                                      ? 'Urgente'
+                                      : t.priority === 'high'
+                                        ? 'Alta'
+                                        : t.priority === 'medium'
+                                          ? 'Média'
+                                          : 'Baixa'}
+                                  </span>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="start"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-36 p-1 bg-[var(--surface)] border-[var(--line2)] rounded-xl shadow-xl z-50 text-[11px]"
+                                >
+                                  <div className="flex flex-col gap-0.5">
+                                    {(['urgent', 'high', 'medium', 'low'] as TaskPriorityLevel[]).map(
+                                      (p) => (
+                                        <button
+                                          key={p}
+                                          type="button"
+                                          onClick={async (e) => {
+                                            e.stopPropagation()
+                                            await updateTask(t.id, { priority: p })
+                                          }}
+                                          className={`px-2 py-1.5 rounded-lg text-left font-semibold transition-colors cursor-pointer ${
+                                            t.priority === p
+                                              ? 'bg-[#0066FF]/15 text-[#0066FF]'
+                                              : 'hover:bg-[var(--line2)] text-[var(--fg)]'
+                                          }`}
+                                        >
+                                          {p === 'urgent'
+                                            ? 'Urgente'
+                                            : p === 'high'
+                                              ? 'Alta'
+                                              : p === 'medium'
+                                                ? 'Média'
+                                                : 'Baixa'}
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </td>
+                          )}
+
+                          {/* COLUNA RESPONSÁVEIS COMO BOLHAS DE PERFIL (ITEM 5 E ITEM 12) */}
+                          {visibleCols.assignees && (
+                            <td className="py-[12px] px-[12px]">
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <CoyAssigneePicker
+                                  value={assigneesList}
+                                  multiple={true}
+                                  variant="avatars-only"
+                                  onChange={async (vals: string[]) => {
+                                    await updateTask(t.id, {
+                                      assignees: vals,
+                                      assignee_name: vals.join(', '),
+                                    })
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          )}
+
+                          {/* COLUNA PRAZO */}
+                          {visibleCols.dueDate && (
+                            <td className="py-[12px] px-[12px] text-[var(--ds-muted)] font-mono text-[11.5px]">
+                              {t.due_date || '—'}
+                            </td>
+                          )}
+
+                          {/* COLUNA SUBTAREFAS (+ X SUBTAREFAS BADGE COMO NA FOTO) */}
+                          {visibleCols.subtasks && (
+                            <td className="py-[12px] px-[12px]">
+                              {totalSub > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExpandedListRows((prev) => ({ ...prev, [t.id]: !isExpanded }))
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg)] border border-[var(--line2)] hover:border-[#0066FF]/60 text-[11px] text-[var(--fg)] font-semibold transition-colors cursor-pointer select-none"
+                                  title="Clique para expandir/recolher subtarefas"
+                                >
+                                  <GitBranch className="w-3 h-3 text-[#0066FF]" />
+                                  <span>+ {totalSub} subtarefas</span>
+                                </button>
+                              ) : (
+                                <span className="text-[var(--ds-muted)] text-[11px]">—</span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* COLUNA COMENTÁRIOS RÁPIDOS (ITEM 11 E 12) */}
+                          {visibleCols.comments && (
+                            <td className="py-[12px] px-[12px]">
+                              <TaskQuickCommentsPopover
+                                taskId={t.id}
+                                taskTitle={t.title}
+                                comments={t.comments || []}
+                                currentUserName={authenticatedUser?.name || 'Administrador'}
+                                onAddComment={async (text) => {
+                                  const author = authenticatedUser?.name || 'Administrador'
+                                  await addTaskComment(t.id, {
+                                    id: `comm_${Date.now()}`,
+                                    author_name: author,
+                                    content: text,
+                                    created_at: new Date().toISOString(),
+                                  })
+                                }}
+                              />
+                            </td>
+                          )}
+
+                          {/* COLUNAS DE CAMPOS PERSONALIZADOS */}
+                          {customFieldDefs
+                            .filter((cf) => visibleCols.customFieldIds.includes(cf.id))
+                            .map((cf) => {
+                              const fVal = t.custom_fields?.find((f) => f.field_id === cf.id)?.value
+                              return (
+                                <td key={cf.id} className="py-[12px] px-[12px] text-[12px] text-[var(--fg)] max-w-[200px] truncate break-words">
+                                  {fVal !== undefined && fVal !== null && fVal !== '' ? (
+                                    <AutoLinkText text={String(fVal)} />
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                              )
+                            })}
+
+                          {/* COLUNA AÇÕES (3 PONTOS COM MENU COMPLETO) */}
+                          <td className="py-[12px] px-[16px] text-right">
+                            <div className="inline-flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                              <Popover>
+                                <PopoverTrigger
+                                  className="p-1 rounded-md text-[var(--ds-muted)] hover:text-[var(--fg)] hover:bg-[var(--line2)] transition-colors cursor-pointer outline-none"
+                                  title="Opções da tarefa"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="end"
+                                  className="w-56 p-1.5 bg-[var(--surface)] border-[var(--line2)] rounded-xl shadow-2xl text-[var(--fg)] z-50 text-[11.5px]"
+                                >
+                                  <div className="flex flex-col gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditModal(t, 'details')}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--line2)] text-left cursor-pointer"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
+                                      <span>Abrir detalhes</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(t.id)
+                                      }}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--line2)] text-left cursor-pointer"
+                                    >
+                                      <Copy className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
+                                      <span>Copiar identificador</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setMoveCopyTask(t)}
+                                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--line2)] text-left cursor-pointer"
+                                    >
+                                      <ArrowRightLeft className="w-3.5 h-3.5 text-[#0066FF]" />
+                                      <span>Mover ou copiar tarefa</span>
+                                    </button>
+
+                                    {canArchiveRow && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await archiveTask(t.id, !Boolean(t.is_archived))
+                                        }}
+                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--line2)] text-left cursor-pointer"
+                                      >
+                                        {t.is_archived ? (
+                                          <>
+                                            <ArchiveRestore className="w-3.5 h-3.5 text-emerald-500" />
+                                            <span>Restaurar tarefa</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Archive className="w-3.5 h-3.5 text-[var(--ds-muted)]" />
+                                            <span>Arquivar tarefa</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+
+                                    {canDeleteRow && (
+                                      <div className="mt-1 pt-1 border-t border-[var(--line)]">
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (confirm('Tem certeza que deseja remover esta tarefa permanentemente?')) {
+                                              await handleDeleteTask(t.id)
+                                            }
+                                          }}
+                                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-500 hover:bg-red-500/10 text-left cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <span>Remover permanentemente</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* SUBTAREFAS EXPANDIDAS ALINHADAS COM AS COLUNAS (ITEM 6) */}
+                        {isExpanded &&
+                          childSubs.map((sub) => {
+                            const canDeleteSub = canUserDeleteTask(userPermCtx, sub)
+                            const subAssignees =
+                              sub.assignees && sub.assignees.length > 0
+                                ? sub.assignees
+                                : sub.assignee_name
+                                  ? sub.assignee_name.split(',').map((s) => s.trim()).filter(Boolean)
+                                  : []
+
+                            return (
+                              <tr
+                                key={sub.id}
+                                onClick={() => handleOpenEditModal(sub, 'details')}
+                                className="border-b border-[var(--line)] bg-[var(--bg)]/50 hover:bg-[var(--ds-hover)] cursor-pointer transition-colors"
+                              >
+                                {/* SUBTAREFA NOME */}
+                                <td className="py-[10px] pl-[44px] pr-[16px] text-[12px] text-[var(--fg)]">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#0066FF] shrink-0" />
+                                    <span>{sub.title}</span>
+                                  </div>
+                                </td>
+
+                                {/* SUBTAREFA CLIENTE */}
+                                {visibleCols.client && (
+                                  <td className="py-[10px] px-[12px] text-[11.5px] text-[var(--ds-muted)]">
+                                    {sub.client_name_snapshot || '—'}
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA STATUS CLICÁVEL RÁPIDO (ITEM 6) */}
+                                {visibleCols.status && (
+                                  <td className="py-[10px] px-[12px]">
+                                    <TaskQuickStatusPopover
+                                      currentStatus={sub.status_key || 'A Fazer'}
+                                      availableStatuses={columns}
+                                      onSelectStatus={async (newStatus) => {
+                                        await updateTask(sub.id, { status_key: newStatus })
+                                      }}
+                                    />
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA PRIORIDADE */}
+                                {visibleCols.priority && (
+                                  <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
+                                    {sub.priority}
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA RESPONSÁVEIS */}
+                                {visibleCols.assignees && (
+                                  <td className="py-[10px] px-[12px]">
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                      <CoyAssigneePicker
+                                        value={subAssignees}
+                                        multiple={true}
+                                        variant="avatars-only"
+                                        onChange={async (vals: string[]) => {
+                                          await updateTask(sub.id, {
+                                            assignees: vals,
+                                            assignee_name: vals.join(', '),
+                                          })
+                                        }}
+                                      />
+                                    </div>
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA PRAZO */}
+                                {visibleCols.dueDate && (
+                                  <td className="py-[10px] px-[12px] text-[var(--ds-muted)] font-mono text-[11px]">
+                                    {sub.due_date || '—'}
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA TIPO */}
+                                {visibleCols.subtasks && (
+                                  <td className="py-[10px] px-[12px] text-[11px] text-[var(--ds-muted)]">
+                                    Subtarefa
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA COMENTÁRIOS */}
+                                {visibleCols.comments && (
+                                  <td className="py-[10px] px-[12px]">
+                                    <TaskQuickCommentsPopover
+                                      taskId={sub.id}
+                                      taskTitle={sub.title}
+                                      comments={sub.comments || []}
+                                      currentUserName={authenticatedUser?.name || 'Administrador'}
+                                      onAddComment={async (text) => {
+                                        const author = authenticatedUser?.name || 'Administrador'
+                                        await addTaskComment(sub.id, {
+                                          id: `comm_${Date.now()}`,
+                                          author_name: author,
+                                          content: text,
+                                          created_at: new Date().toISOString(),
+                                        })
+                                      }}
+                                    />
+                                  </td>
+                                )}
+
+                                {/* SUBTAREFA CAMPOS CUSTOMIZADOS */}
+                                {customFieldDefs
+                                  .filter((cf) => visibleCols.customFieldIds.includes(cf.id))
+                                  .map((cf) => (
+                                    <td key={cf.id} className="py-[10px] px-[12px] text-[11.5px] text-[var(--ds-muted)]">
+                                      —
+                                    </td>
+                                  ))}
+
+                                {/* SUBTAREFA EXCLUSÃO COM POPOVER DE AVISO (ITEM 6) */}
+                                <td className="py-[10px] px-[16px] text-right">
+                                  {canDeleteSub && (
+                                    <div onClick={(e) => e.stopPropagation()} className="inline-block">
+                                      <Popover
+                                        open={subtaskToDeleteId === sub.id}
+                                        onOpenChange={(op) => setSubtaskToDeleteId(op ? sub.id : null)}
+                                      >
+                                        <PopoverTrigger
+                                          className="text-[var(--ds-muted)] opacity-50 hover:opacity-100 hover:text-red-500 cursor-pointer p-1"
+                                          title="Excluir subtarefa com aviso"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </PopoverTrigger>
+                                        <PopoverContent
+                                          align="end"
+                                          className="w-56 p-2.5 bg-[var(--surface)] border border-red-500/30 rounded-xl shadow-2xl z-50 text-[11.5px]"
+                                        >
+                                          <div className="flex flex-col gap-2 text-left">
+                                            <span className="font-semibold text-red-500">Excluir subtarefa?</span>
+                                            <span className="text-[10.5px] text-[var(--ds-muted)] leading-tight">
+                                              Tem certeza de que deseja remover esta subtarefa?
+                                            </span>
+                                            <div className="flex items-center justify-end gap-1.5 pt-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => setSubtaskToDeleteId(null)}
+                                                className="px-2 py-0.5 rounded text-[10.5px] bg-[var(--line2)] text-[var(--fg)] hover:opacity-80 cursor-pointer"
+                                              >
+                                                Cancelar
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  await handleDeleteTask(sub.id)
+                                                  setSubtaskToDeleteId(null)
+                                                }}
+                                                className="px-2.5 py-0.5 rounded text-[10.5px] font-bold bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                                              >
+                                                Excluir
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                      </React.Fragment>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      {/* MODAL MOVER / COPIAR TAREFA DA TABELA */}
+      <TaskMoveCopyModal
+        open={Boolean(moveCopyTask)}
+        onOpenChange={(op) => !op && setMoveCopyTask(null)}
+        task={moveCopyTask}
+      />
 
       {/* MODAL TASKDIALOG (ROOMIE OFFICE AI) */}
       <TaskDialog

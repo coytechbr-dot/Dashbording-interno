@@ -1,7 +1,7 @@
 # Matriz Oficial de Funcionalidades, Permissões e Governança RBAC (`CoyDash`)
 
 > **Status:** Ativo — Fonte da Verdade de Controle de Acesso e Funcionalidades  
-> **Última Atualização:** 2026-11-13 (Sessão 28 — Sistema de Ordens de Serviço em 3 Etapas para Clientes, Kanban Embutido na Ficha 360º e Solicitação de Proposta Comercial para Leads)  
+> **Última Atualização:** 2026-11-14 (Sessão 29 — Reestruturação de Projetos & Tarefas, Exclusão Segura com Digitação Obrigatória, Mover/Copiar Tarefas & Subtarefas, Responsáveis em Bolha, Status/Comentários Rápidos e Tabela Estilo Comercial com Seletor de Colunas Dinâmicas)  
 > **Motor Central:** [`src/lib/access-control.ts`](../src/lib/access-control.ts)  
 > **Componente Dropdown:** [`src/components/ui/coy-dropdown.tsx`](../src/components/ui/coy-dropdown.tsx)  
 > **Enforcement Backend:** [`src/app/api/coydash/sync/route.ts`](../src/app/api/coydash/sync/route.ts)
@@ -49,14 +49,14 @@ Legenda:
 
 | Chave (`FeaturePermissionKey`) | Funcionalidade | `GUEST` | `GUEST_COLLABORATOR` | `GUEST_MANAGER` | `MEMBER` | `ADMIN` | Sensível |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `tasks.create` | **Criar tarefas e subtarefas** | Não | **Sim** | **Sim** | **Sim** | **Sim** | Não |
-| `tasks.edit_assigned` | **Editar tarefas e trocar status/responsáveis** (briefing, datas, campos personalizados) | **Sim** | **Sim** | **Sim** | **Sim** | **Sim** | Não |
+| `tasks.create` | **Criar tarefas e subtarefas, duplicar/copiar tarefas e promover subtarefas** | Não | **Sim** | **Sim** | **Sim** | **Sim** | Não |
+| `tasks.edit_assigned` | **Editar tarefas, trocar status/responsáveis, mover tarefas entre listas e converter tarefas em subtarefas** | **Sim** | **Sim** | **Sim** | **Sim** | **Sim** | Não |
 | `tasks.archive_own` | **Arquivar/restaurar tarefas criadas por si mesmo** | **Sim** | **Sim** | **Sim** | **Sim** | **Sim** | Não |
 | `tasks.archive_any` | **Arquivar/restaurar tarefas de qualquer membro** | Não | Não | **Sim** | **Sim** | **Sim** | **Sim** |
 | `tasks.delete_own` | **Excluir permanentemente tarefas criadas por si mesmo** | **Sim** | **Sim** | **Sim** | **Sim** | **Sim** | Não |
 | `tasks.delete_any` | **Excluir permanentemente tarefas de terceiros** | Não | Não | **Sim** | **Sim** | **Sim** | **Sim** |
 | `tasks.manage_columns` | **Gerenciar colunas de status Kanban** (criar/excluir colunas) | Não | Não | **Sim** | **Sim** | **Sim** | Não |
-| `tasks.manage_structure` | **Criar e excluir Setores (Pastas) e Listas** na barra lateral | Não | Não | **Sim** | **Sim** | **Sim** | **Sim** |
+| `tasks.manage_structure` | **Criar, reordenar, mover entre projetos e excluir Projetos e Listas** na barra lateral (exclusão com modal de confirmação exigindo digitação do nome exato) | Não | Não | **Sim** | **Sim** | **Sim** | **Sim** |
 
 ### 3.2. Módulo: Campos Personalizados (`custom_fields.*`)
 
@@ -115,7 +115,12 @@ Implementadas em conjunto no banco de dados (Migration `012`), API (`/api/coydas
    - Tarefas arquivadas saem da listagem/kanban padrão e dos contadores da barra lateral, ficando acessíveis pelo filtro **"Arquivadas"** na visualização de lista/kanban.
 3. **Exclusão Permanente Protegida (`DELETE_TASK`):**
    - **`canUserDeleteTask(ctx, task)`:** Retorna `true` se o usuário possui `tasks.delete_any` (`GUEST_MANAGER`, `MEMBER`, `ADMIN`) **OU** se possui `tasks.delete_own` **e** é o criador da tarefa.
-   - Tanto na UI (`TaskDialog` menu discreto `...` e ações da lista) quanto no endpoint `POST /api/coydash/sync` (`403 Forbidden`), usuários sem permissão não conseguem excluir tarefas de terceiros.
+   - Tanto na UI (`TaskDialog` menu discreto `...`, menu de 3 pontos do card e ações da lista) quanto no endpoint `POST /api/coydash/sync` (`403 Forbidden`), usuários sem permissão não conseguem excluir tarefas de terceiros.
+4. **Exclusão Crítica de Projetos e Listas (`ConfirmDeleteModal`):**
+   - Exclusão de projetos/pastas e listas restrita a usuários com permissão `tasks.manage_structure` (`GUEST_MANAGER`, `MEMBER`, `ADMIN`).
+   - Requer confirmação ativa com alerta vermelho e **digitação exata do nome do item** para habilitar o botão de exclusão irreversível, evitando cliques acidentais.
+5. **Mover, Copiar e Conversão de Tarefas e Subtarefas:**
+   - Possibilidade de mover tarefas entre listas de qualquer projeto, copiar/duplicar tarefas mantendo subtarefas e campos, converter tarefas normais em subtarefas de outra tarefa-mãe e promover subtarefas existentes para tarefas principais.
 
 ---
 

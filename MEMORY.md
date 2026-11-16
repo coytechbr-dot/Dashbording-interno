@@ -24,8 +24,68 @@ Sempre que um agente assumir ou operar neste workspace, ele **DEVE** seguir esta
 ## 📍 2. Estado Atual do Projeto & Próximo Passo Imediato
 
 - **Repositório GitHub Oficial:** `https://github.com/coytechbr-dot/Dashbording-interno` (Branch: `main`)
-- **Fase Atual:** `FASE 19 CONCLUÍDA: Vinculação Completa de Dados do Cliente e Auto-Atribuição no Modo Eu nas Tarefas de Proposta Comercial de Leads`
+- **Fase Atual:** `FASE 20 CONCLUÍDA: Reestruturação Completa de Projetos & Tarefas, Exclusão Segura com Digitação do Nome, Mover/Copiar Tarefas & Subtarefas, Responsáveis em Bolha no Título, Status/Comentários Rápidos, Tabela Estilo Comercial, AutoLink Global de URLs em Azul Elétrico, Drag & Drop de Listas no Menu Lateral, Renomeação para "Minhas Tarefas" e Seletor Flutuante de Ícones, Emojis e Upload de Imagens`
 - **Últimas Entregas Concluídas:**
+  --17. **Seletor de Ícones, Emojis e Upload de Imagens com Busca para Projetos e Listas (`coy-icon-picker.tsx` — Sessão 43):**
+      - **Clique Direto no Ícone:** Clicar sobre o ícone de qualquer Projeto (pasta) ou Lista no menu lateral (e no cabeçalho do Workspace) abre um mini balão flutuante (Popover) com design premium do CoyDash.
+      - **3 Abas Completas:**
+        - **Ícones:** Mais de 60 ícones Lucide categorizados para negócios, projetos, tarefas, tecnologia, marketing e operações, com nomes e tags em português.
+        - **Emojis:** Catálogo pesquisável de dezenas de emojis organizados por intenção de trabalho.
+        - **Carregar Imagem:** Upload de arquivo (PNG, JPG, WebP, SVG) com redimensionamento e otimização automática via Canvas no cliente (64x64 WebP/PNG ultra-leve de 1-3KB) ou inserção de URL externa.
+      - **Busca em Tempo Real:** Campo de pesquisa integrado com filtragem instantânea tanto de ícones quanto de emojis.
+      - **Restaurar Padrão:** Botão de reset rápido para o ícone padrão (`Folder` ou `List`).
+      - **Renderizador Universal (`CoyIconRenderer`):** Suporta nativamente ícones Lucide, caracteres Emoji Unicode e imagens personalizadas (Data URL e HTTP) em toda a aplicação (menu lateral, cabeçalho de workspace, dropdown de listas e modal de mover/copiar).
+  --16. **Renomeação da Tela de "Tarefas" para "Minhas Tarefas" (`coydash-shell.tsx` & `tasks-workspace-view.tsx` — Sessão 42):**
+      - **Atualização na Barra de Navegação Lateral (`MAIN_NAV_ITEMS`):** O item principal da rota `/tarefas` foi renomeado de "Tarefas" para **"Minhas Tarefas"**, refletindo com clareza o comportamento da tela que exibe por padrão as tarefas filtradas para o colaborador atual através do "Modo Eu" ativo.
+      - **Refinamento nos Breadcrumbs do Workspace:** O cabeçalho da visão geral em `tasks-workspace-view.tsx` agora inclui a trilha `Projetos & Tarefas / Minhas Tarefas` em Azul Elétrico quando o usuário está na tela inicial de tarefas sem uma lista específica selecionada.
+  --15. **Reordenação de Listas por Drag and Drop (Arrastar e Soltar) no Menu Lateral (`coydash-shell.tsx` — Sessão 41):**
+      - **Drag & Drop Nativo em HTML5:** Implementado sistema de arrasto suave e responsivo para reordenar listas dentro de seus respectivos projetos/pastas pelo menu lateral. Utiliza HTML5 nativo (`draggable`, `onDragStart`, `onDragOver`, `onDrop`), garantindo isolamento absoluto sem conflitar com o `@hello-pangea/dnd` do Kanban de tarefas.
+      - **Alça Visual de Arrasto (`GripVertical`):** Adicionado ícone de grip no hover de cada lista (`cursor-grab active:cursor-grabbing`), além de indicadores visuais de linha azul (`border-t-2` / `border-b-2 border-t-[#0066FF]`) e opacidade durante o movimento.
+      - **Mover Listas Entre Projetos por Arraste:** Permite arrastar uma lista diretamente para dentro do cabeçalho de outro projeto, disparando atualização automática do `folder_id` no banco de dados e abrindo o projeto de destino.
+      - **Ajuste Relativo nas Setas de Subir/Descer:** Corrigida a função `handleMoveListOrder` para operar de forma relativa dentro da pasta em foco, garantindo sincronia perfeita com a reordenação manual.
+  --14. **Correção de Duplicação Infinita de Status no Popover do Card (`TaskQuickStatusPopover` — Sessão 40):**
+      - **Causa Raiz Identificada:** O componente `TaskCard` passava para o `TaskQuickStatusPopover` o array global `taskStatuses` contendo os status de todas as listas da organização juntas (15+ registros repetidos para "A FAZER", "EM PROGRESSO", etc.). O `TaskQuickStatusPopover` não realizava deduplicação interna por nome, renderizando dezenas de botões duplicados no menu popover.
+      - **Resolução Implementada:**
+        - Em `src/components/tasks/task-quick-status-popover.tsx`: implementada deduplicação canônica com `useMemo` baseada em `key = item.name.trim().toUpperCase()`. Cada status agora aparece estritamente uma única vez na lista, com container de rolagem suave (`max-h-60 overflow-y-auto`).
+        - Em `src/components/tasks/task-card.tsx`: adicionado filtro inteligente `relevantStatuses`, isolando apenas os status pertencentes à lista específica da tarefa (`task.list_id`) tanto no status do card principal quanto nas subtarefas.
+  --13. **AutoLink Global de URLs, Quebra Segura de Links & Padronização da Largura de Comentários (Sessão 39):**
+      - **Componente Utilitário `AutoLinkText` (`src/components/ui/auto-link-text.tsx`):**
+        - Parser inteligente de URLs (`http://`, `https://`, `www.`) que transforma links brutos digitados em qualquer parte do app em âncoras interativas estilizadas no Azul Elétrico oficial (`#0066FF`, hover `#0052CC`, underline e cursor pointer).
+        - Links configurados com abertura obrigatória em nova guia (`target="_blank" rel="noopener noreferrer"`), isolamento de eventos (`e.stopPropagation()`) e tratamento de pontuação gramatical acidental ao final da URL (vírgulas, pontos finais, parênteses).
+      - **Resolução do Vazamento de Texto no Balão de Comentários:**
+        - Aplicação de `break-words [overflow-wrap:anywhere] [word-break:break-word] max-w-full overflow-hidden` nos containers e textos de comentários de `task-dialog.tsx`, `task-quick-comments-popover.tsx` e `task-comments.tsx`, impedindo definitivamente que links longos vazem para fora da caixa do balão.
+      - **Padronização e Ampliação da Largura da Coluna de Comentários:**
+        - No modal principal da tarefa (`TaskDialog`), a coluna de comentários foi ampliada de 300px para **380px** (`w-[380px] min-w-[360px] max-w-[400px] border-l border-[var(--line2)]`), garantindo muito mais respiro para leitura e envio.
+        - No popover flutuante de comentários rápidos (`TaskQuickCommentsPopover`), a largura foi igualmente padronizada para **`w-[380px] sm:w-[400px]`**, estabelecendo um padrão único e confortável em todo o sistema.
+      - **Integração no Kanban e Workspace:**
+        - Exibição de links formatados com `AutoLinkText` nas descrições de tarefas (`task-card.tsx`) e nas células de campos personalizados da tabela ClickUp/Comercial (`tasks-workspace-view.tsx`).
+  --12. **Correção de Erro de Hidratação HTML por Botões Aninhados (`<button>` dentro de `<button>` — Sessão 38):**
+      - **Causa Raiz Identificada:** O `PopoverTrigger` do `@base-ui/react` renderiza nativamente um elemento `<button>`. No `CoyAssigneePicker`, quando `children` recebia um `<button>` (como em `TaskDialog`), ou quando operava no modo múltiplo padrão com um botão interno de "Adicionar", o HTML gerava um `<button>` como descendente direto de outro `<button>`, violando as regras do HTML e disparando erro de hidratação no Next.js (Turbopack).
+      - **Resolução Implementada:**
+        - Em `src/components/ui/coy-assignee-picker.tsx`: configurado `render={isReactElement ? children : undefined}` no `PopoverTrigger`, delegando ao Base UI o controle sem criar uma tag `<button>` wrapper externa quando o filho já é um elemento React.
+        - Substituído o `<button>` interno do modo múltiplo padrão por um `<span className="...">` estilizado, preservando 100% o Design System e a acessibilidade enquanto mantém a árvore DOM estritamente válida.
+        - Build validado com sucesso via Turbopack (`next build`): 0 erros de compilação em todas as 35 rotas.
+  --11. **Refinamento de Largura, Espaçamento e Isolamento de Camada do Modal Mover/Copiar (`task-move-copy-modal.tsx` — Sessão 37):**
+      - **Expansão de Largura útil:** Ampliação do popup de `max-w-md` (448px) para `sm:max-w-xl md:max-w-2xl lg:max-w-[680px] w-full` (+50% de espaço útil), eliminando a sensação de elementos espremidos e texto vazando.
+      - **Isolamento de Z-Index & Overlay:** Configurado backdrop dedicado escurecido com `bg-black/80 backdrop-blur-md` em `z-[90]` e popup em `z-[95]`, garantindo que os elementos da tarefa ou tela ao fundo não interfiram visualmente.
+      - **Nova Estrutura da Lista de Destino:** Adicionado campo de busca instantânea por lista ou projeto (`listSearch`) e reestruturação de cada item com ícone dedicado, nome da lista em destaque (`text-[13px] font-semibold`) e projeto/pasta em linha secundária identificada com ícone de pasta (`FolderKanban`), evitando truncamentos feios.
+      - **Card da Tarefa Selecionada e Ações:** Card superior com identificador da tarefa com respiro e quebra segura de texto (`break-words`), e botões de ação com ícones destacados em caixas dedicadas e descrições claras.
+  --10. **Reestruturação e Recursos Avançados de Projetos, Listas, Tarefas e Subtarefas (Sessão 36):**
+      - **1. Tooltip/Hover no Menu Lateral:** Adicionado atributo nativo `title` em todos os projetos/pastas e listas da barra lateral para revelar o nome completo quando o texto é truncado.
+      - **2. Renomeação Global:** "Setores e Projetos" atualizado para "Projetos & Tarefas" tanto na barra lateral (`coydash-shell.tsx`) quanto nos breadcrumbs do workspace (`tasks-workspace-view.tsx`).
+      - **3. Exclusão Protegida com Confirmação Ativa (`ConfirmDeleteModal`):** Modal de segurança para exclusão de projetos e listas, exigindo a digitação exata do nome do item para destravar a ação de exclusão, restrito a perfis com permissão `tasks.manage_structure`.
+      - **4. Mover, Copiar e Conversão de Tarefas e Subtarefas (`TaskMoveCopyModal`):** Modal completo para mover tarefas entre listas de qualquer projeto, clonar/duplicar tarefas preservando dados e subtarefas, converter tarefas normais em subtarefas de outra tarefa-mãe e promover subtarefas existentes para tarefas independentes de primeira classe.
+      - **5. Responsáveis em Bolhas Circulares no Título e Ordenação:** No `TaskDialog`, o campo de responsáveis agora fica posicionado como bolhas de perfil circulares sobrepostas coladas ao lado direito do input de título; ao abrir o popover (`CoyAssigneePicker` com variante `avatars-only`), os colaboradores já selecionados são ordenados automaticamente no topo da lista.
+      - **6. Reordenação e Movimentação de Listas:** Setas de subir/descer na barra lateral para reordenar listas dentro de projetos com persistência de ordem, e seletor de projeto no modal de edição de listas permitindo transferir listas entre projetos.
+      - **7. Status e Exclusão Segura de Subtarefas:** Na lista de subtarefas dentro da tarefa, o status agora pode ser trocado com 1 clique via `TaskQuickStatusPopover`, e a exclusão conta com popover de confirmação de aviso com badge de alerta.
+      - **8. Reposicionamento do "Modo Eu":** O botão "Modo Eu" foi movido para o lado direito da barra de filtros (`ml-auto`) para melhor ergonomia visual.
+      - **9. Pesquisa Interna de Tarefas em Tempo Real:** Campo de busca com ícone de lupa adicionado diretamente na barra de filtros do workspace, filtrando em tempo real no Kanban e na Lista.
+      - **10. Menu de 3 Pontos no Card de Tarefas (`MoreVertical`):** Popover completo com "Abrir tarefa", "Copiar identificador da tarefa", "Destacar nos favoritos", "Mover ou copiar tarefa", "Arquivar tarefa" e "Remover registro permanentemente" (com confirmação).
+      - **11. Status no Card e Alinhamento:** Status posicionado à esquerda do título dentro do modal da tarefa; pílula de status clicável no card do Kanban e da Lista via `TaskQuickStatusPopover`.
+      - **12. Status e Comentários Rápidos:** Popover `TaskQuickStatusPopover` e popover de comentários `TaskQuickCommentsPopover` permitindo visualizar e enviar mensagens sem abrir a tarefa completa.
+      - **13. Layout da Lista estilo Tabela Comercial / ClickUp:** Tabela escura de alta densidade inspirada na tabela comercial e no ClickUp, com colunas estruturadas (Tarefa, Cliente, Status clicável, Prioridade com bandeira, Responsáveis em bolhas, Prazo, Subtarefas `+ X subtarefas`, Comentários rápidos e Ações), além do botão **"+ Campos / Colunas"** no canto superior direito com minibalão de busca para alternar a exibição de colunas padrão e campos personalizados.
+  -9. **Correção de Fechamento de Tags JSX no Menu Lateral (`coydash-shell.tsx`):**
+     - Remoção de bloco duplicado de fechamento de tags (`</div>`, `)`, `})`, `)}`) nas linhas 890-896 da listagem de pastas/listas da barra lateral que disparava erro `Unterminated regexp literal` no compilador Turbopack do Next.js 16.3.6. Validação de AST do TypeScript concluída com 0 erros.
   -8. **Layout Unificado da Lista de Demandas do Cliente em Linha Contínua (`ClientDemandsTab`):**
      - **Padronização Visual com a Lista de Subtarefas:** Eliminação dos cards dispersos e substituição por container único com cantos suaves `rounded-2xl`, borda sutil `border-[var(--line2)]` e divisórias `divide-y divide-[var(--line)]`.
      - **Linha Horizontal Contínua e Interativa:**
@@ -672,5 +732,218 @@ Toda a interface do **CoyDash** segue estritamente o documento [`spec/DESIGN.md`
     5. Estúdio Avançado de Campos Personalizados (`CustomFieldsStudioDialog`) com artes 3D e grupos pré-configurados.
     6. Sistema de 5 níveis de permissão (`RBAC`) e arquivamento seguro de tarefas com trilha de auditoria.
   - **Status:** **Sincronizado e Enviado com Sucesso Absoluto para a Branch main no GitHub**.
+
+### [2026-11-14] — Sessão 35: Correção de Erro de Build Turbopack (Unterminated regexp literal em coydash-shell.tsx)
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Corrigir erro de parsing no Next.js Turbopack (`./src/components/layout/coydash-shell.tsx:892:34: Unterminated regexp literal`).
+- **Diagnóstico do Problema:**
+  - Havia um bloco de 7 linhas com fechamentos de tags duplicados (`</div>`, `)`, `})`, `)}`) nas linhas 890 a 896, logo após o fechamento do bloco de listagem de listas dentro de pastas no menu lateral da barra de navegação.
+  - Com os tokens duplicados de fechamento de blocos de código JSX, a tag de fechamento subsequente `</div>` era interpretada pelo lexer/parser como início de expressão regular não terminada (`/...`), interrompendo o build com Turbopack.
+- **Arquivos Modificados:**
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx): Removida a duplicação dos fechamentos entre as linhas 889 e 897, restabelecendo a árvore correta de tags JSX.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 35 e atualização do estado atual na Seção 2.
+- **Validação Técnica:**
+  - Parse de AST do TypeScript (`ts.createSourceFile` com `ScriptKind.TSX`): **0 diagnósticos/erros sintáticos**.
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 36: Reestruturação Avançada de Projetos, Listas, Tarefas, Subtarefas e Tabela Comercial ClickUp
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Implementar as 12 demandas solicitadas pelo usuário para o módulo de Tarefas, Listas e Projetos, aprimorando a usabilidade, segurança e estética com base nas imagens e especificações de design do CoyDash.
+- **Novos Componentes Criados:**
+  - [`src/components/tasks/task-quick-status-popover.tsx`](./src/components/tasks/task-quick-status-popover.tsx): Popover rápido de seleção de status com pílula estilizada, lista de status com indicadores visuais coloridos e clique único sem abrir o diálogo da tarefa.
+  - [`src/components/tasks/task-quick-comments-popover.tsx`](./src/components/tasks/task-quick-comments-popover.tsx): Popover flutuante para leitura e envio rápido de comentários com scroll suave, contadores, avatares e atalhos de teclado (`Ctrl+Enter`).
+  - [`src/components/tasks/task-move-copy-modal.tsx`](./src/components/tasks/task-move-copy-modal.tsx): Modal com 4 modos operacionais: 1. Mover tarefa para outra lista/projeto; 2. Copiar/duplicar tarefa (com opção de clonar subtarefas); 3. Converter tarefa em subtarefa de outra tarefa existente; 4. Promover subtarefa para tarefa principal independente.
+  - [`src/components/layout/confirm-delete-modal.tsx`](./src/components/layout/confirm-delete-modal.tsx): Modal de exclusão com alerta crítico, listagem dos itens afetados e trava de segurança exigindo que o usuário digite o nome exato do projeto/lista antes de confirmar.
+- **Arquivos Modificados:**
+  - [`src/components/ui/coy-assignee-picker.tsx`](./src/components/ui/coy-assignee-picker.tsx): Adicionada variante `variant="avatars-only"` (renderizando círculos sobrepostos de avatares com borda) e lógica de ordenação automática que eleva os membros selecionados ao topo da lista do minipop.
+  - [`src/app/api/coydash/sync/route.ts`](./src/app/api/coydash/sync/route.ts): Atualizada ação `UPDATE_TASK_LIST` para persistir alterações de `folder_id` no banco Supabase.
+  - [`src/lib/coydash-store.tsx`](./src/lib/coydash-store.tsx): Atualizada função `updateTaskList` com parâmetro opcional `folderId?: string`, e adicionada ação `reorderTaskLists` com persistência em `localStorage`.
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx):
+    - Nome de "Setores e Projetos" alterado para "Projetos & Tarefas".
+    - Adicionado `title` em cada pasta e lista para mostrar o nome completo no hover.
+    - Integrado `ConfirmDeleteModal` nas lixeiras de projetos e listas.
+    - Adicionadas setas de subir/descer (`ChevronUp` / `ChevronDown`) no hover de listas para reordenação instantânea.
+    - Adicionado seletor de projeto no modal de edição de listas para permitir mover listas entre projetos.
+  - [`src/components/tasks/task-card.tsx`](./src/components/tasks/task-card.tsx):
+    - Integrado `TaskQuickStatusPopover` permitindo alternar status diretamente pelo card do Kanban.
+    - Integrado menu de 3 pontos (`MoreVertical`) com as opções exatas do print: "Copiar identificador da tarefa", "Destacar nos favoritos", "Mover ou copiar tarefa", "Arquivar tarefa" e "Remover registro permanentemente".
+    - Integrado `TaskQuickCommentsPopover` no ícone de comentários.
+    - Adicionado seletor de responsáveis em bolhas de perfil (`avatars-only`) no rodapé do card.
+    - Subtarefas expandidas agora contam com alternador rápido de status e botão de exclusão com confirmação.
+  - [`src/components/tasks/task-dialog.tsx`](./src/components/tasks/task-dialog.tsx):
+    - Reestruturado o cabeçalho: Status posicionado à esquerda do título, input de título no centro e responsáveis representados unicamente por bolhas de perfil circulares sobrepostas posicionadas imediatamente ao lado direito do título.
+    - Adicionado `TaskMoveCopyModal` no menu de 3 pontos do diálogo.
+    - Na lista de subtarefas da tarefa, o status agora é clicável para troca rápida e a exclusão possui popover com aviso de confirmação.
+  - [`src/components/tasks/tasks-workspace-view.tsx`](./src/components/tasks/tasks-workspace-view.tsx):
+    - Breadcrumb atualizado para "Projetos & Tarefas".
+    - Botão "Modo Eu" movido para o lado direito da barra de filtros (`ml-auto`).
+    - Campo de pesquisa em tempo real (`taskSearchQuery`) adicionado à barra de filtros.
+    - Novo layout da lista transformado em tabela no estilo comercial / ClickUp com colunas estruturadas, status clicável rápido, prioridade com bandeira, avatares em bolhas sobrepostas, subtarefas expansíveis `+ X subtarefas`, comentários rápidos e menu de 3 pontos.
+    - Botão "+ Campos / Colunas" no canto superior direito com minibalão de busca para ativar/desativar colunas padrão e campos personalizados com persistência local.
+  - [`spec/coydash_funcionalidades_e_permissoes.md`](./spec/coydash_funcionalidades_e_permissoes.md): Atualizada matriz de funcionalidades com os novos recursos e regras de governança para exclusão e movimentação de estruturas e tarefas.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 37: Ajuste de Largura, Espaçamento e Isolamento de Camada do Modal Mover/Copiar Tarefas
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Atender à solicitação do usuário de corrigir o modal "Mover ou Copiar Tarefa", que se encontrava estreito (`max-w-md` / 448px) provocando quebra de textos, corte de nomes de listas e pastas na listagem de destino e visibilidade residual de elementos do modal pai ao fundo.
+- **Arquivos Modificados:**
+  - [`src/components/ui/dialog.tsx`](./src/components/ui/dialog.tsx): Adicionado suporte a `overlayClassName?: string` em `DialogContent`, permitindo personalizar escurecimento, desfoque e z-index do backdrop em modais aninhados.
+  - [`src/components/tasks/task-move-copy-modal.tsx`](./src/components/tasks/task-move-copy-modal.tsx):
+    - Ampliação da largura de `max-w-md` para `sm:max-w-xl md:max-w-2xl lg:max-w-[680px] w-full p-6 sm:p-7`.
+    - Isolamento de camadas: backdrop com `overlayClassName="z-[90] bg-black/80 backdrop-blur-md"` e popup em `z-[95]`, eliminando interferência visual de elementos de trás.
+    - Card de identificação da tarefa com respiro, indicador em azul e quebra de texto suave (`break-words`).
+    - Botões de seleção de ação com ícones destacados em boxes de `36x36px` (`rounded-xl`), título em `text-[13px] font-bold` e descrições explicativas completas.
+    - Nova busca dinâmica por nome da lista ou projeto (`listSearch`) na lista de destinos.
+    - Reestruturação dos itens de lista: nome da lista em destaque com tipografia `font-semibold text-[13px]` e projeto/pasta em linha secundária identificada por ícone de pasta (`FolderKanban`), evitando truncamentos.
+    - Ações do rodapé com espaçamento ampliado e botões confortáveis.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 37 e atualização do estado na Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 38: Correção do Erro de Hidratação por Botão Aninhado (`<button>` dentro de `<button>`)
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Eliminar o erro de hidratação e console warning do React/Next.js (`In HTML, <button> cannot be a descendant of <button>`) ocorrido durante a renderização do `TaskDialog` e `CoyAssigneePicker`.
+- **Diagnóstico Técnico da Causa Raiz:**
+  - O componente `PopoverTrigger` do `@base-ui/react` renderiza por padrão uma tag HTML `<button>`.
+  - No `TaskDialog` (linha 1335), era passado um `<button type="button">` como `children` para o `CoyAssigneePicker`. Como o `CoyAssigneePicker` envolvia `{children}` diretamente dentro do `<PopoverTrigger>`, o DOM gerado continha `<button><button>...</button></button>`.
+  - Além disso, no próprio `CoyAssigneePicker` (linha 288), no modo múltiplo sem `children`, havia uma pílula renderizada como `<button type="button">` dentro do `<PopoverTrigger>`, gerando a mesma violação de sintaxe HTML.
+- **Arquivos Modificados:**
+  - [`src/components/ui/coy-assignee-picker.tsx`](./src/components/ui/coy-assignee-picker.tsx):
+    - Configurado o prop `render={isReactElement ? children : undefined}` no `PopoverTrigger`, permitindo que o Base UI utilize o próprio elemento filho como trigger sem criar um wrapper `<button>` externo.
+    - Configurado `nativeButton={isReactElement && typeof (children as React.ReactElement).type === 'string' ? (children as React.ReactElement).type === 'button' : undefined}` para garantir que acessibilidade, eventos e atributos ARIA sejam injetados adequadamente.
+    - Substituída a tag `<button>` interna da pílula do modo múltiplo padrão por `<span className="...">`, mantendo o estilo e eliminando a duplicação.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 38 e atualização do estado na Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+  - `npm run build`: **Compilação com Turbopack concluída com sucesso** (35 rotas geradas sem avisos de sintaxe ou hidratação).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 39: Correção de Vazamento de Texto em Comentários, AutoLink Global de URLs em Azul e Padronização da Coluna
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:**
+  1. Corrigir o transbordamento/vazamento de texto para fora da borda do card de comentário quando o usuário insere URLs ou textos extensos sem espaçamento (como links longos do Google Drive).
+  2. Ampliar e padronizar a largura da coluna de comentários e do popover rápido de comentários em todas as telas (`w-[380px]`).
+  3. Transformar qualquer URL adicionada em qualquer parte do app em um link interativo em Azul Elétrico (`#0066FF`), clicável e abrindo em nova guia (`target="_blank" rel="noopener noreferrer"`).
+- **Novos Componentes Criados:**
+  - [`src/components/ui/auto-link-text.tsx`](./src/components/ui/auto-link-text.tsx): Componente `AutoLinkText` e função `formatTextWithLinks`, com Regex para detecção de protocolos (`https://`, `http://` e `www.`), sanitização de pontuação gramatical no final de links, quebra de linha segura anti-transbordamento (`break-words [overflow-wrap:anywhere] [word-break:break-word]`) e estilização oficial no Azul Elétrico `#0066FF` (hover `#0052CC`).
+- **Arquivos Modificados:**
+  - [`src/components/tasks/task-dialog.tsx`](./src/components/tasks/task-dialog.tsx):
+    - Coluna lateral direita de comentários ampliada e padronizada para `w-[380px] min-w-[360px] max-w-[400px]` (antes era apenas 300px), adicionando borda divisória esquerda `border-l border-[var(--line2)]`.
+    - Balão do comentário ajustado com `max-w-full overflow-hidden break-words [overflow-wrap:anywhere] [word-break:break-word]`.
+    - Conteúdo dos comentários agora passa por `<AutoLinkText text={comm.content} />`.
+  - [`src/components/tasks/task-quick-comments-popover.tsx`](./src/components/tasks/task-quick-comments-popover.tsx):
+    - Popover rápido ampliado de 320px para a largura padrão `w-[380px] sm:w-[400px]`.
+    - Balões e textos de comentários atualizados com regras anti-vazamento e integrados ao `<AutoLinkText text={c.content} />`.
+  - [`src/components/tasks/task-comments.tsx`](./src/components/tasks/task-comments.tsx):
+    - Texto dos comentários integrado ao `<AutoLinkText text={cm.content} />` com proteção contra overflow.
+  - [`src/components/tasks/task-card.tsx`](./src/components/tasks/task-card.tsx):
+    - Descrição da tarefa com `<AutoLinkText text={task.description} />`.
+  - [`src/components/tasks/tasks-workspace-view.tsx`](./src/components/tasks/tasks-workspace-view.tsx):
+    - Células de campos personalizados na tabela integradas ao `<AutoLinkText text={String(fVal)} />`.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 39 e atualização do estado na Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 40: Correção de Duplicação e Repetição Excessiva de Status no Popover do Card
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Corrigir a repetição em massa de status (múltiplas linhas idênticas de "A FAZER", "EM PROGRESSO", etc.) ao abrir o popover de troca rápida de status no card de tarefa.
+- **Diagnóstico Técnico da Causa Raiz:**
+  - O banco de dados do Supabase armazena colunas de status vinculadas individualmente a cada `list_id`. Ao carregar os dados no store global (`useCoyDash`), o array `taskStatuses` continha todos os status de todas as listas da organização reunidos.
+  - O componente `TaskCard` estava passando o array bruto `taskStatuses` para o `TaskQuickStatusPopover`, e o popover realizava um `.map()` direto sem deduplicar por nome. Consequentemente, para cada lista existente no sistema, uma nova linha idêntica de "A FAZER" era renderizada na tela.
+- **Arquivos Modificados:**
+  - [`src/components/tasks/task-quick-status-popover.tsx`](./src/components/tasks/task-quick-status-popover.tsx):
+    - Implementada normalização e deduplicação automática via `useMemo` com `Map<string, Status>` chaveado por `st.name.trim().toUpperCase()`.
+    - Garantido que cada status seja exibido no máximo uma vez, com fallback para os 4 status padrão caso a lista venha vazia.
+    - Adicionado limite de altura com rolagem suave (`max-h-60 overflow-y-auto pr-0.5 no-scrollbar`) e largura confortável de `w-52`.
+  - [`src/components/tasks/task-card.tsx`](./src/components/tasks/task-card.tsx):
+    - Criado filtro `relevantStatuses` com `useMemo` para selecionar apenas os status pertencentes à lista real da tarefa (`task.list_id`).
+    - Atualizadas as chamadas de `TaskQuickStatusPopover` do card principal e de suas subtarefas para usar `relevantStatuses`.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 40 e atualização do estado na Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 41: Reordenação de Listas por Drag and Drop (Arrastar e Soltar) no Menu Lateral
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Implementar a capacidade de alterar a ordem das listas dentro de um projeto no menu lateral arrastando os itens (Drag & Drop), além das setas existentes.
+- **Arquivos Modificados:**
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx):
+    - Implementado Drag & Drop HTML5 nativo com estados `draggedListId`, `dragOverListId` e `dragOverPosition` (`top` / `bottom`).
+    - Adicionado ícone de alça `GripVertical` no hover de cada lista com cursores `cursor-grab` e `active:cursor-grabbing`.
+    - Feedback visual com transparência suave (`opacity-40 scale-[0.98] border-dashed border-[#0066FF]`) e linha azul de inserção (`border-t-2` ou `border-b-2 border-t-[#0066FF]`).
+    - Criada a função `handleDropList` para reposicionar a lista na posição exata dentro da pasta, preservando as outras pastas intactas e persistindo no `localStorage` via `reorderTaskLists`.
+    - Suporte a arrastar listas para outros projetos: ao soltar uma lista sobre o cabeçalho de outro projeto, a lista é movida para aquele projeto e tem seu `folder_id` atualizado via `updateTaskList`.
+    - Corrigido `handleMoveListOrder` (setas de subir/descer) para ordenar de forma relativa aos itens da mesma pasta.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 41 e atualização do estado na Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-14] — Sessão 42: Renomeação da Tela Principal de Tarefas para "Minhas Tarefas"
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Trocar o nome da tela principal de "Tarefas" para "Minhas Tarefas" na navegação lateral e cabeçalhos do ecossistema CoyDash.
+- **Arquivos Modificados:**
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx):
+    - Atualizado o item de menu `MAIN_NAV_ITEMS` correspondente à rota `/tarefas`: `label` alterado de `'Tarefas'` para `'Minhas Tarefas'` (mantendo o `screenKey: 'tarefas'` para as regras de permissão).
+    - Tooltips, contadores e navegação agora identificam a tela como "Minhas Tarefas".
+  - [`src/components/tasks/tasks-workspace-view.tsx`](./src/components/tasks/tasks-workspace-view.tsx):
+    - Atualizado o breadcrumb da visualização para indicar `Projetos & Tarefas / Minhas Tarefas` em Azul Elétrico quando o usuário estiver na tela de visão geral.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 42 e atualização de status.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-15] — Sessão 43: Seletor Flutuante de Ícones, Emojis e Upload de Imagem com Busca para Projetos e Listas
+- **Agente:** Antigravity (Gemini)
+- **Objetivo da Sessão:** Permitir que os ícones de Projetos (Pastas) e Listas sejam alterados clicando diretamente sobre eles, abrindo um mini balão flutuante (Popover) com abas de Ícones Lucide, Emojis e Carregamento de Imagem personalizada, com campo de busca instantânea.
+- **Arquivos Criados & Modificados:**
+  - [`src/components/ui/coy-icon-picker.tsx`](./src/components/ui/coy-icon-picker.tsx) *(Novo)*:
+    - Componente universal `CoyIconRenderer`: interpreta e renderiza automaticamente ícones Lucide por chave de texto, caracteres Emojis Unicode e imagens personalizadas (Data URL em base64 ou URLs externas).
+    - Componente `CoyIconPickerPopover`: mini balão com Popover do Base UI contendo:
+      - Campo de busca instantânea com filtro em tempo real por palavras-chave e nomes em português.
+      - 3 Abas: **Ícones** (+60 opções Lucide com categorias), **Emojis** (dezenas de opções temáticas) e **Carregar Imagem** (upload com redimensionamento automático via Canvas para 64x64 WebP de 1-3KB ou URL direta).
+      - Botão de reset rápido para o ícone padrão (`Folder` ou `List`).
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx):
+    - Integração na árvore de Projetos: ícone da pasta agora é um gatilho clicável com `CoyIconPickerPopover`, isolado do accordion de expandir/recolher para evitar aninhamento de `<button>`.
+    - Integração na árvore de Listas: ícone da lista posicionado antes do `<Link>` e envolvido com `CoyIconPickerPopover`, impedindo navegação ao trocar o ícone.
+    - Modais `folderModal` e `listModal`: adicionado botão estilizado "Mais ícones, emojis & imagens" abrindo o seletor.
+  - [`src/components/tasks/tasks-workspace-view.tsx`](./src/components/tasks/tasks-workspace-view.tsx):
+    - Cabeçalho do Workspace: exibe o ícone da lista ativa com `CoyIconPickerPopover` ao lado do título `<h1>`, permitindo trocar com 1 clique direto na página.
+    - Dropdown de listas: atualizado para renderizar o ícone com `CoyIconRenderer`.
+  - [`src/components/tasks/task-move-copy-modal.tsx`](./src/components/tasks/task-move-copy-modal.tsx):
+    - Itens da lista de destino agora usam `CoyIconRenderer`.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 43 e atualização da Seção 2.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+  - Servidor local iniciado via Turbopack em `http://localhost:3005`.
+- **Status:** **Concluído com Êxito**.
+
+### [2026-11-15] — Sessão 44: Correção de Vazamento de Nomes de Ícones em Texto Azul na Barra Lateral
+- **Agente:** Antigravity (Gemini)
+- **Diagnóstico Técnico da Causa Raiz:**
+  - Algumas pastas e listas salvas no Supabase continham nomes de ícones Lucide específicos (ex: `'FolderKanban'` em "Clientes - Tarefas" e `'FileSignature'` em "Proposta Comercial").
+  - O componente `CoyIconRenderer` verificava `AVAILABLE_ICONS[icon]` e, como essas duas chaves não estavam mapeadas no objeto, o código caía no fallback padrão de emoji/texto simples (`<span>{icon}</span>`), imprimindo a string literal do nome do ícone (`FolderKanban` e `FileSignature`).
+  - Como o gatilho possuía a cor `text-[#0066FF]`, os nomes apareciam renderizados em texto azul vazando por trás dos títulos dos projetos e listas.
+- **Resolução Implementada:**
+  - [`src/components/ui/coy-icon-picker.tsx`](./src/components/ui/coy-icon-picker.tsx):
+    - Adicionados os ícones `FolderKanban`, `FileSignature`, `FolderPlus`, `FolderOpen`, `FolderArchive`, `FileCheck`, `FileSpreadsheet`, `CheckCheck`, `ListTodo`, `LayoutList`, `ClipboardCheck`, `Users2`, `UserPlus` e `Milestone` tanto no `AVAILABLE_ICONS` quanto no catálogo pesquisável `ICON_CATALOG`.
+    - Blindagem em `CoyIconRenderer`: criada checagem `isAsciiIdentifier = /^[A-Za-z0-9_\-\s]+$/.test(cleanIcon)`. Se a string for um identificador alfanumérico e não existir no catálogo, **o componente renderiza obrigatoriamente o ícone de fallback (`Folder` ou `List`), JAMAIS exibindo a string como texto puro**.
+  - [`src/components/layout/coydash-shell.tsx`](./src/components/layout/coydash-shell.tsx):
+    - Adicionado `FolderKanban` e `FileSignature` no `ICON_MAP`.
+    - Adicionado `shrink-0 overflow-hidden` nos containers de trigger de ícones para assegurar isolamento visual absoluto.
+  - [`MEMORY.md`](./MEMORY.md): Registro da Sessão 44.
+- **Validação Técnica:**
+  - `npx tsc --noEmit`: **0 erros de tipagem** (código de saída 0).
+  - Servidor local ativo em `http://localhost:3005`.
+- **Status:** **Concluído com Êxito**.
+
+
+
+
+
 
 

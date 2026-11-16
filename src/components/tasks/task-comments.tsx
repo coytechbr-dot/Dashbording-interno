@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Send, Trash2, MessageSquare } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import { AudioPlayer } from './audio-player'
+import { AutoLinkText } from '@/components/ui/auto-link-text'
 import type { TaskCommentItem } from '@/types/coydash'
 
 interface TaskCommentsProps {
@@ -103,8 +104,8 @@ export function TaskComments({
                 </div>
 
                 {cm.content && (
-                  <p className="text-[13px] text-[var(--fg)] whitespace-pre-wrap leading-relaxed">
-                    {cm.content}
+                  <p className="text-[13px] text-[var(--fg)] whitespace-pre-wrap leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] max-w-full">
+                    <AutoLinkText text={cm.content} />
                   </p>
                 )}
 

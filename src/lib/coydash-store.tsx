@@ -497,7 +497,8 @@ interface CoyDashContextValue {
   updateTaskFolder: (folderId: string, name: string, icon: string) => Promise<void>
   deleteTaskFolder: (folderId: string) => Promise<void>
   createTaskList: (folderId: string, name: string, icon?: string) => Promise<string | null>
-  updateTaskList: (listId: string, name: string, icon: string) => Promise<void>
+  updateTaskList: (listId: string, name: string, icon: string, folderId?: string) => Promise<void>
+  reorderTaskLists: (orderedListIds: string[]) => Promise<void>
   deleteTaskList: (listId: string) => Promise<void>
   createTaskStatus: (listId: string, name: string, color: string, orderIndex: number) => Promise<void>
   updateTaskStatusColumn: (
@@ -1951,12 +1952,34 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateTaskList = async (listId: string, name: string, icon: string) => {
+  const updateTaskList = async (listId: string, name: string, icon: string, folderId?: string) => {
     setTaskLists((prev) =>
-      prev.map((l) => (l.id === listId ? { ...l, name, icon } : l))
+      prev.map((l) =>
+        l.id === listId
+          ? { ...l, name, icon, ...(folderId ? { folder_id: folderId } : {}) }
+          : l
+      )
     )
-    await postAction('UPDATE_TASK_LIST', { listId, name, icon })
+    await postAction('UPDATE_TASK_LIST', { listId, name, icon, folder_id: folderId })
     await refreshFromDatabase(currentOrg.id)
+  }
+
+  const reorderTaskLists = async (orderedListIds: string[]) => {
+    setTaskLists((prev) => {
+      const map = new Map(prev.map((l) => [l.id, l]))
+      const next: TaskListItem[] = []
+      orderedListIds.forEach((id) => {
+        const item = map.get(id)
+        if (item) {
+          next.push(item)
+          map.delete(id)
+        }
+      })
+      return [...next, ...Array.from(map.values())]
+    })
+    try {
+      localStorage.setItem(`coydash_list_order_${currentOrg.id}`, JSON.stringify(orderedListIds))
+    } catch {}
   }
 
   const deleteTaskList = async (listId: string) => {
@@ -2755,6 +2778,7 @@ export function CoyDashProvider({ children }: { children: React.ReactNode }) {
         deleteTaskFolder,
         createTaskList,
         updateTaskList,
+        reorderTaskLists,
         deleteTaskList,
         createTaskStatus,
         updateTaskStatusColumn,

@@ -415,11 +415,10 @@ export function DealDialog({
                     key={opt.id}
                     type="button"
                     onClick={() => setPriority(opt.id)}
-                    className={`h-[36px] rounded-[8px] text-[11px] font-semibold flex items-center justify-center gap-[5px] border transition-colors cursor-pointer ${
-                      priority === opt.id
-                        ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent'
-                        : 'border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)] bg-[var(--bg)]'
-                    }`}
+                    className={`h-[36px] rounded-[8px] text-[11px] font-semibold flex items-center justify-center gap-[5px] border transition-colors cursor-pointer ${priority === opt.id
+                      ? 'bg-[var(--fg)] text-[var(--bg)] border-transparent'
+                      : 'border-[var(--line2)] text-[var(--ds-muted)] hover:text-[var(--fg)] bg-[var(--bg)]'
+                      }`}
                   >
                     <span className={`w-[6px] h-[6px] rounded-full ${opt.dot}`} />
                     <span>{opt.label}</span>

@@ -38,10 +38,16 @@ import {
   Activity,
   Compass,
   Smartphone,
+  ChevronUp,
+  GripVertical,
+  FolderKanban,
+  FileSignature,
 } from 'lucide-react'
 import { useCoyDash } from '@/lib/coydash-store'
 import { signOutAction } from '@/app/actions/auth'
 import { hasFeaturePermission, isGuestScopedLevel } from '@/lib/access-control'
+import { ConfirmDeleteModal } from '@/components/layout/confirm-delete-modal'
+import { CoyIconPickerPopover, CoyIconRenderer } from '@/components/ui/coy-icon-picker'
 import {
   IllustrationNpcMascot,
   IconRobot16,
@@ -53,7 +59,7 @@ const MAIN_NAV_ITEMS = [
   { icon: Briefcase, label: 'Comercial', path: '/comercial', screenKey: 'comercial' },
   { icon: Users, label: 'Clientes', path: '/clientes', screenKey: 'clientes' },
   { icon: MessageSquare, label: 'Atendimento', path: '/atendimento', screenKey: 'atendimento' },
-  { icon: CheckSquare, label: 'Tarefas', path: '/tarefas', screenKey: 'tarefas' },
+  { icon: CheckSquare, label: 'Minhas Tarefas', path: '/tarefas', screenKey: 'tarefas' },
   { icon: Bot, label: 'Agentes IA', path: '/agentes', screenKey: 'agentes' },
   { icon: Megaphone, label: 'Marketing', path: '/marketing', screenKey: 'marketing' },
   { icon: UserCheck, label: 'Membros e Colaboradores', path: '/colaboradores', screenKey: 'colaboradores' },
@@ -81,6 +87,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeW
   Target,
   Rocket,
   Shield,
+  FolderKanban,
+  FileSignature,
 }
 
 const FOLDER_ICONS = [
@@ -134,9 +142,23 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
     deleteTaskFolder,
     createTaskList,
     updateTaskList,
+    reorderTaskLists,
     deleteTaskList,
     currentUserPermissions,
   } = useCoyDash()
+
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<{
+    open: boolean
+    type: 'projeto' | 'lista'
+    id: string
+    name: string
+    subItemsCount: number
+  }>({ open: false, type: 'projeto', id: '', name: '', subItemsCount: 0 })
+
+  // Estados de Drag & Drop nativo para reordenar listas dentro de projetos
+  const [draggedListId, setDraggedListId] = useState<string | null>(null)
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null)
+  const [dragOverPosition, setDragOverPosition] = useState<'top' | 'bottom' | null>(null)
 
   const isGuest = isGuestScopedLevel(currentUserPermissions?.access_type)
   const canManageStructure = hasFeaturePermission(
@@ -357,7 +379,7 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
           router.push(`/listas/${newId}`)
         }
       } else if (listModal.listId) {
-        await updateTaskList(listModal.listId, name, listModal.icon)
+        await updateTaskList(listModal.listId, name, listModal.icon, folderId)
         setListModal({ open: false, mode: 'create', folderId: '', name: '', icon: 'List' })
       }
     } catch (err) {
@@ -366,6 +388,66 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
     } finally {
       setIsSavingTaskItem(false)
     }
+  }
+
+  const handleMoveListOrder = (listId: string, folderId: string, direction: 'up' | 'down') => {
+    const folderLists = taskLists.filter((l) => l.folder_id === folderId)
+    const curIdx = folderLists.findIndex((l) => l.id === listId)
+    if (curIdx === -1) return
+    const targetIdx = direction === 'up' ? curIdx - 1 : curIdx + 1
+    if (targetIdx < 0 || targetIdx >= folderLists.length) return
+
+    const reorderedFolder = [...folderLists]
+    const [moved] = reorderedFolder.splice(curIdx, 1)
+    reorderedFolder.splice(targetIdx, 0, moved)
+
+    const otherLists = taskLists.filter((l) => l.folder_id !== folderId)
+    const newGlobalOrder = [...otherLists, ...reorderedFolder].map((l) => l.id)
+    void reorderTaskLists(newGlobalOrder)
+  }
+
+  const handleDropList = (targetListId: string, targetFolderId: string) => {
+    if (!draggedListId || draggedListId === targetListId) {
+      setDraggedListId(null)
+      setDragOverListId(null)
+      setDragOverPosition(null)
+      return
+    }
+
+    const draggedItem = taskLists.find((l) => l.id === draggedListId)
+    if (!draggedItem) return
+
+    // Se a lista foi arrastada para outro projeto/pasta, persiste no banco
+    if (draggedItem.folder_id !== targetFolderId) {
+      void updateTaskList(draggedListId, draggedItem.name, draggedItem.icon, targetFolderId)
+    }
+
+    // Listas do projeto de destino (sem o item arrastado)
+    const targetFolderLists = taskLists.filter(
+      (l) => l.folder_id === targetFolderId && l.id !== draggedListId
+    )
+
+    const targetIdx = targetFolderLists.findIndex((l) => l.id === targetListId)
+    const insertIdx =
+      dragOverPosition === 'bottom'
+        ? targetIdx + 1
+        : targetIdx >= 0
+          ? targetIdx
+          : targetFolderLists.length
+
+    const newFolderLists = [...targetFolderLists]
+    newFolderLists.splice(insertIdx, 0, { ...draggedItem, folder_id: targetFolderId })
+
+    // Monta a ordem global respeitando os demais projetos
+    const otherLists = taskLists.filter(
+      (l) => l.folder_id !== targetFolderId && l.id !== draggedListId
+    )
+    const newGlobalOrder = [...otherLists, ...newFolderLists].map((l) => l.id)
+    void reorderTaskLists(newGlobalOrder)
+
+    setDraggedListId(null)
+    setDragOverListId(null)
+    setDragOverPosition(null)
   }
 
   const handleSendAgentMessage = async (e: React.FormEvent) => {
@@ -629,13 +711,13 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* ÁRVORE DE SETORES & PROJETOS */}
+          {/* ÁRVORE DE PROJETOS & TAREFAS */}
           {!sidebarCollapsed && (
             <>
               <div className="border-t border-[var(--line)] pt-[12px] flex flex-col gap-[6px]">
             <div className="flex items-center justify-between px-[10px]">
               <span className="text-[10.5px] font-semibold tracking-[0.06em] uppercase text-[var(--ds-muted)]">
-                Setores & Projetos
+                Projetos & Tarefas
               </span>
               {canManageStructure && (
                 <button
@@ -648,7 +730,7 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                       icon: 'Folder',
                     })
                   }
-                  title="Criar novo setor"
+                  title="Criar novo projeto"
                   className="w-[22px] h-[22px] rounded-[6px] bg-[var(--surface)] hover:bg-[#0066FF] hover:text-white grid place-items-center text-[var(--ds-muted)] transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" strokeWidth={2} />
@@ -659,8 +741,8 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
             {visibleTaskFolders.length === 0 ? (
               <div className="px-[10px] py-[8px] text-[11px] text-[var(--ds-muted)] bg-[var(--surface)]/50 rounded-[10px] border border-dashed border-[var(--line2)]">
                 {isGuest
-                  ? 'Nenhum setor ou projeto liberado para o seu perfil.'
-                  : 'Clique em + para criar setores (ex: Tráfego, Comercial, Design).'}
+                  ? 'Nenhum projeto ou lista liberado para o seu perfil.'
+                  : 'Clique em + para criar projetos (ex: Tráfego, Comercial, Design).'}
               </div>
             ) : (
               <div className="flex flex-col gap-[4px]">
@@ -671,25 +753,74 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
 
                   return (
                     <div key={folder.id} className="flex flex-col gap-[2px]">
-                      <div className="group flex items-center justify-between px-[8px] py-[6px] rounded-[8px] hover:bg-[var(--ds-hover)] text-[12px] text-[var(--fg)]">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenFolders((prev) => ({
-                              ...prev,
-                              [folder.id]: !isOpen,
-                            }))
+                      <div
+                        onDragOver={(e) => {
+                          if (!canManageStructure || !draggedListId) return
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (!draggedListId) return
+                          const draggedItem = taskLists.find((l) => l.id === draggedListId)
+                          if (draggedItem && draggedItem.folder_id !== folder.id) {
+                            void updateTaskList(draggedListId, draggedItem.name, draggedItem.icon, folder.id)
+                            setOpenFolders((prev) => ({ ...prev, [folder.id]: true }))
                           }
-                          className="flex items-center gap-[6px] flex-1 min-w-0 text-left cursor-pointer"
-                        >
-                          {isOpen ? (
-                            <ChevronDown className="w-3 h-3 text-[var(--ds-muted)] shrink-0" />
-                          ) : (
-                            <ChevronRight className="w-3 h-3 text-[var(--ds-muted)] shrink-0" />
-                          )}
-                          <FolderIcon className="w-3.5 h-3.5 text-[#0066FF] shrink-0" strokeWidth={1.6} />
-                          <span className="truncate font-medium">{folder.name}</span>
-                        </button>
+                          setDraggedListId(null)
+                          setDragOverListId(null)
+                          setDragOverPosition(null)
+                        }}
+                        className={`group flex items-center justify-between px-[8px] py-[6px] rounded-[8px] hover:bg-[var(--ds-hover)] text-[12px] text-[var(--fg)] transition-all ${
+                          draggedListId ? 'border border-dashed border-transparent hover:border-[#0066FF]/60' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-[4px] flex-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenFolders((prev) => ({
+                                ...prev,
+                                [folder.id]: !isOpen,
+                              }))
+                            }
+                            className="p-1 rounded-[4px] hover:bg-[var(--surface)] text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer shrink-0 transition-colors"
+                            title={isOpen ? 'Recolher projeto' : 'Expandir projeto'}
+                          >
+                            {isOpen ? (
+                              <ChevronDown className="w-3 h-3 shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3 shrink-0" />
+                            )}
+                          </button>
+
+                          {/* Mini Balão para Alterar Ícone do Projeto */}
+                          <CoyIconPickerPopover
+                            currentIcon={folder.icon}
+                            defaultIcon="Folder"
+                            disabled={!canManageStructure}
+                            title={`Ícone de ${folder.name}`}
+                            onSelect={async (newIcon) => {
+                              await updateTaskFolder(folder.id, folder.name, newIcon)
+                            }}
+                            triggerClassName="w-6 h-6 rounded-[5px] hover:bg-[var(--surface)] hover:ring-1 hover:ring-[#0066FF]/60 text-[#0066FF] transition-all flex items-center justify-center cursor-pointer shrink-0 overflow-hidden"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenFolders((prev) => ({
+                                ...prev,
+                                [folder.id]: !isOpen,
+                              }))
+                            }
+                            title={folder.name}
+                            className="truncate font-medium text-left flex-1 cursor-pointer select-none"
+                          >
+                            {folder.name}
+                          </button>
+                        </div>
 
                         {canManageStructure && (
                           <div className="flex items-center gap-[2px] opacity-80 group-hover:opacity-100">
@@ -704,7 +835,7 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                   icon: 'List',
                                 })
                               }
-                              title="Criar projeto/lista neste setor"
+                              title="Criar lista neste projeto"
                               className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
                             >
                               <Plus className="w-3 h-3" />
@@ -720,16 +851,28 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                   icon: folder.icon,
                                 })
                               }
-                              title="Editar setor"
+                              title="Editar projeto"
                               className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
                             >
                               <Pencil className="w-2.5 h-2.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => deleteTaskFolder(folder.id)}
-                              title="Excluir setor"
-                              className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                              onClick={() => {
+                                const countInFolder = tasks.filter((t) => {
+                                  const l = taskLists.find((list) => list.id === t.list_id)
+                                  return l?.folder_id === folder.id
+                                }).length
+                                setConfirmDeleteModal({
+                                  open: true,
+                                  type: 'projeto',
+                                  id: folder.id,
+                                  name: folder.name,
+                                  subItemsCount: countInFolder,
+                                })
+                              }}
+                              title="Excluir projeto (Ação segura restrita)"
+                              className="w-[20px] h-[20px] rounded-[5px] hover:bg-[var(--surface)] grid place-items-center text-[var(--ds-muted)] hover:text-red-500 cursor-pointer transition-colors"
                             >
                               <Trash2 className="w-2.5 h-2.5" />
                             </button>
@@ -758,7 +901,7 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                               </button>
                             ) : null
                           ) : (
-                            folderLists.map((list) => {
+                            folderLists.map((list, listIdx) => {
                               const ListIcon = ICON_MAP[list.icon] || List
                               const listPath = `/listas/${list.id}`
                               const listActive = pathname === listPath
@@ -769,20 +912,92 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                               return (
                                 <div
                                   key={list.id}
-                                  className={`group flex items-center justify-between px-[8px] py-[5px] rounded-[8px] text-[11.5px] transition-colors ${
+                                  draggable={canManageStructure}
+                                  onDragStart={(e) => {
+                                    if (!canManageStructure) return
+                                    e.dataTransfer.setData('text/plain', list.id)
+                                    e.dataTransfer.effectAllowed = 'move'
+                                    setDraggedListId(list.id)
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedListId(null)
+                                    setDragOverListId(null)
+                                    setDragOverPosition(null)
+                                  }}
+                                  onDragOver={(e) => {
+                                    if (!canManageStructure || !draggedListId || draggedListId === list.id) return
+                                    e.preventDefault()
+                                    e.dataTransfer.dropEffect = 'move'
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    const midY = rect.top + rect.height / 2
+                                    const pos = e.clientY < midY ? 'top' : 'bottom'
+                                    if (dragOverListId !== list.id || dragOverPosition !== pos) {
+                                      setDragOverListId(list.id)
+                                      setDragOverPosition(pos)
+                                    }
+                                  }}
+                                  onDragLeave={(e) => {
+                                    if (dragOverListId === list.id && !e.currentTarget.contains(e.relatedTarget as Node)) {
+                                      setDragOverListId(null)
+                                      setDragOverPosition(null)
+                                    }
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleDropList(list.id, folder.id)
+                                  }}
+                                  className={`group relative flex items-center justify-between px-[6px] py-[5px] rounded-[8px] text-[11.5px] transition-all select-none ${
                                     listActive
                                       ? 'bg-[var(--surface)] text-[#0066FF] font-semibold'
                                       : 'text-[var(--ds-muted)] hover:bg-[var(--ds-hover)] hover:text-[var(--fg)]'
+                                  } ${
+                                    draggedListId === list.id
+                                      ? 'opacity-40 scale-[0.98] border border-dashed border-[#0066FF] bg-[#0066FF]/10'
+                                      : ''
+                                  } ${
+                                    dragOverListId === list.id && dragOverPosition === 'top'
+                                      ? 'border-t-2 border-t-[#0066FF]'
+                                      : ''
+                                  } ${
+                                    dragOverListId === list.id && dragOverPosition === 'bottom'
+                                      ? 'border-b-2 border-b-[#0066FF]'
+                                      : ''
                                   }`}
+                                  title={list.name}
                                 >
-                                  <Link
-                                    href={listPath}
-                                    className="flex items-center gap-[7px] flex-1 min-w-0 truncate"
-                                  >
-                                    <ListIcon className="w-3 h-3 shrink-0" strokeWidth={1.6} />
-                                    <span className="truncate">{list.name}</span>
-                                  </Link>
-                                  <div className="flex items-center gap-[3px]">
+                                  {/* Alça de Arraste (Grip) no Hover para quem tem permissão */}
+                                  {canManageStructure && (
+                                    <div
+                                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing mr-1 -ml-1 text-[var(--ds-muted)] hover:text-[#0066FF] shrink-0 transition-opacity"
+                                      title="Clique e arraste para reordenar esta lista"
+                                    >
+                                      <GripVertical className="w-3 h-3" />
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center gap-[4px] flex-1 min-w-0">
+                                    {/* Mini Balão para Alterar Ícone da Lista */}
+                                    <CoyIconPickerPopover
+                                      currentIcon={list.icon}
+                                      defaultIcon="List"
+                                      disabled={!canManageStructure}
+                                      title={`Ícone de ${list.name}`}
+                                      onSelect={async (newIcon) => {
+                                        await updateTaskList(list.id, list.name, newIcon, folder.id)
+                                      }}
+                                      triggerClassName="w-5 h-5 rounded-[4px] hover:bg-[var(--surface)] hover:ring-1 hover:ring-[#0066FF]/60 text-[#0066FF] transition-all flex items-center justify-center cursor-pointer shrink-0 overflow-hidden"
+                                    />
+
+                                    <Link
+                                      href={listPath}
+                                      title={list.name}
+                                      className="flex items-center gap-[4px] flex-1 min-w-0 truncate"
+                                    >
+                                      <span className="truncate" title={list.name}>{list.name}</span>
+                                    </Link>
+                                  </div>
+                                  <div className="flex items-center gap-[2px]">
                                     {countInList > 0 && (
                                       <span className="text-[10px] text-[var(--ds-muted)] px-[4px]">
                                         {countInList}
@@ -790,6 +1005,25 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                     )}
                                     {canManageStructure && (
                                       <>
+                                        {/* BOTOES DE REORDENAR LISTAS NA BARRA LATERAL */}
+                                        <button
+                                          type="button"
+                                          disabled={listIdx === 0}
+                                          onClick={() => handleMoveListOrder(list.id, folder.id, 'up')}
+                                          className="opacity-0 group-hover:opacity-100 disabled:opacity-20 w-[16px] h-[16px] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                                          title="Subir ordem da lista"
+                                        >
+                                          <ChevronUp className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={listIdx === folderLists.length - 1}
+                                          onClick={() => handleMoveListOrder(list.id, folder.id, 'down')}
+                                          className="opacity-0 group-hover:opacity-100 disabled:opacity-20 w-[16px] h-[16px] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
+                                          title="Descer ordem da lista"
+                                        >
+                                          <ChevronDown className="w-2.5 h-2.5" />
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={() =>
@@ -803,15 +1037,23 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                                             })
                                           }
                                           className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[var(--fg)] cursor-pointer"
-                                          title="Renomear lista"
+                                          title="Editar ou mover lista"
                                         >
                                           <Pencil className="w-2.5 h-2.5" />
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => deleteTaskList(list.id)}
-                                          className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-[#0066FF] cursor-pointer"
-                                          title="Excluir lista"
+                                          onClick={() =>
+                                            setConfirmDeleteModal({
+                                              open: true,
+                                              type: 'lista',
+                                              id: list.id,
+                                              name: list.name,
+                                              subItemsCount: countInList,
+                                            })
+                                          }
+                                          className="opacity-0 group-hover:opacity-100 w-[18px] h-[18px] grid place-items-center text-[var(--ds-muted)] hover:text-red-500 cursor-pointer transition-colors"
+                                          title="Excluir lista (Ação segura restrita)"
                                         >
                                           <Trash2 className="w-2.5 h-2.5" />
                                         </button>
@@ -1149,10 +1391,25 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
               </label>
 
               <div className="flex flex-col gap-[6px] text-[12px] text-[var(--ds-muted)]">
-                <span>Ícone do setor</span>
+                <div className="flex items-center justify-between">
+                  <span>Ícone do setor</span>
+                  <CoyIconPickerPopover
+                    currentIcon={folderModal.icon}
+                    defaultIcon="Folder"
+                    title="Escolher ícone, emoji ou imagem"
+                    onSelect={(newIcon) => setFolderModal({ ...folderModal, icon: newIcon })}
+                  >
+                    <button
+                      type="button"
+                      className="text-[11px] text-[#0066FF] hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <span>Mais ícones, emojis & imagens</span>
+                      <ArrowUpRight className="w-3 h-3" />
+                    </button>
+                  </CoyIconPickerPopover>
+                </div>
                 <div className="grid grid-cols-4 gap-[8px]">
                   {FOLDER_ICONS.map((ic) => {
-                    const Comp = ICON_MAP[ic.key] || Folder
                     const selected = folderModal.icon === ic.key
                     return (
                       <button
@@ -1165,12 +1422,18 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                             : 'bg-[var(--bg)] text-[var(--ds-muted)] border-[var(--line2)] hover:text-[var(--fg)]'
                         }`}
                       >
-                        <Comp className="w-4 h-4" />
+                        <CoyIconRenderer icon={ic.key} fallback={Folder} className="w-4 h-4" />
                         <span>{ic.label}</span>
                       </button>
                     )
                   })}
                 </div>
+                {!FOLDER_ICONS.some((ic) => ic.key === folderModal.icon) && (
+                  <div className="flex items-center gap-2 p-2 rounded-[8px] bg-[var(--bg)] border border-[#0066FF]/40 text-[#0066FF] text-[11.5px] font-semibold">
+                    <CoyIconRenderer icon={folderModal.icon} fallback={Folder} className="w-4 h-4" />
+                    <span>Ícone personalizado selecionado</span>
+                  </div>
+                )}
               </div>
 
               <button
@@ -1192,6 +1455,22 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
             </form>
           </div>
         )}
+
+        {/* MODAL DE CONFIRMAÇÃO SEGURA DE EXCLUSÃO (PROJETO OU LISTA) */}
+        <ConfirmDeleteModal
+          open={confirmDeleteModal.open}
+          onOpenChange={(open) => setConfirmDeleteModal((prev) => ({ ...prev, open }))}
+          itemType={confirmDeleteModal.type}
+          itemName={confirmDeleteModal.name}
+          subItemsCount={confirmDeleteModal.subItemsCount}
+          onConfirm={async () => {
+            if (confirmDeleteModal.type === 'projeto') {
+              await deleteTaskFolder(confirmDeleteModal.id)
+            } else {
+              await deleteTaskList(confirmDeleteModal.id)
+            }
+          }}
+        />
 
         {/* MODAL DE CRIAR / EDITAR LISTA / PROJETO (LIST) */}
         {listModal.open && (
@@ -1224,11 +1503,42 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                 />
               </label>
 
+              {/* SELETOR DE PROJETO (PERMITE MOVER A LISTA DE UM PROJETO PARA OUTRO) */}
+              <label className="flex flex-col gap-[6px] text-[12px] text-[var(--ds-muted)]">
+                Projeto pertencente
+                <select
+                  value={listModal.folderId}
+                  onChange={(e) => setListModal({ ...listModal, folderId: e.target.value })}
+                  className="h-[44px] px-[12px] bg-[var(--bg)] border-[1.5px] border-[var(--line2)] focus:border-[#0066FF] rounded-[12px] text-[13px] text-[var(--fg)] outline-none cursor-pointer"
+                >
+                  {taskFolders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="flex flex-col gap-[6px] text-[12px] text-[var(--ds-muted)]">
-                <span>Ícone</span>
+                <div className="flex items-center justify-between">
+                  <span>Ícone da lista</span>
+                  <CoyIconPickerPopover
+                    currentIcon={listModal.icon}
+                    defaultIcon="List"
+                    title="Escolher ícone, emoji ou imagem"
+                    onSelect={(newIcon) => setListModal({ ...listModal, icon: newIcon })}
+                  >
+                    <button
+                      type="button"
+                      className="text-[11px] text-[#0066FF] hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <span>Mais ícones, emojis & imagens</span>
+                      <ArrowUpRight className="w-3 h-3" />
+                    </button>
+                  </CoyIconPickerPopover>
+                </div>
                 <div className="grid grid-cols-3 gap-[8px]">
                   {LIST_ICONS.map((ic) => {
-                    const Comp = ICON_MAP[ic.key] || List
                     const selected = listModal.icon === ic.key
                     return (
                       <button
@@ -1241,12 +1551,18 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
                             : 'bg-[var(--bg)] text-[var(--ds-muted)] border-[var(--line2)] hover:text-[var(--fg)]'
                         }`}
                       >
-                        <Comp className="w-3.5 h-3.5" />
+                        <CoyIconRenderer icon={ic.key} fallback={List} className="w-3.5 h-3.5" />
                         <span>{ic.label}</span>
                       </button>
                     )
                   })}
                 </div>
+                {!LIST_ICONS.some((ic) => ic.key === listModal.icon) && (
+                  <div className="flex items-center gap-2 p-2 rounded-[8px] bg-[var(--bg)] border border-[#0066FF]/40 text-[#0066FF] text-[11.5px] font-semibold">
+                    <CoyIconRenderer icon={listModal.icon} fallback={List} className="w-3.5 h-3.5" />
+                    <span>Ícone personalizado selecionado</span>
+                  </div>
+                )}
               </div>
 
               <button
@@ -1268,6 +1584,22 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
             </form>
           </div>
         )}
+
+        {/* MODAL DE CONFIRMAÇÃO SEGURA DE EXCLUSÃO (PROJETO OU LISTA) */}
+        <ConfirmDeleteModal
+          open={confirmDeleteModal.open}
+          onOpenChange={(open) => setConfirmDeleteModal((prev) => ({ ...prev, open }))}
+          itemType={confirmDeleteModal.type}
+          itemName={confirmDeleteModal.name}
+          subItemsCount={confirmDeleteModal.subItemsCount}
+          onConfirm={async () => {
+            if (confirmDeleteModal.type === 'projeto') {
+              await deleteTaskFolder(confirmDeleteModal.id)
+            } else {
+              await deleteTaskList(confirmDeleteModal.id)
+            }
+          }}
+        />
 
         {/* MODAL DE CRIAR NOVA ORGANIZAÇÃO B2B */}
         {showNewOrgModal && (
@@ -1346,6 +1678,22 @@ export function CoyDashShell({ children }: { children: React.ReactNode }) {
             </form>
           </div>
         )}
+
+        {/* MODAL DE CONFIRMAÇÃO SEGURA DE EXCLUSÃO (PROJETO OU LISTA) */}
+        <ConfirmDeleteModal
+          open={confirmDeleteModal.open}
+          onOpenChange={(open) => setConfirmDeleteModal((prev) => ({ ...prev, open }))}
+          itemType={confirmDeleteModal.type}
+          itemName={confirmDeleteModal.name}
+          subItemsCount={confirmDeleteModal.subItemsCount}
+          onConfirm={async () => {
+            if (confirmDeleteModal.type === 'projeto') {
+              await deleteTaskFolder(confirmDeleteModal.id)
+            } else {
+              await deleteTaskList(confirmDeleteModal.id)
+            }
+          }}
+        />
 
         {/* DRAWER LATERAL DE CONVERSA COM AGENTE DE IA */}
         {activeAgentDrawer && (

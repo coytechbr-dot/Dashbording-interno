@@ -909,9 +909,14 @@ export async function POST(request: NextRequest) {
       }
 
       case 'UPDATE_TASK_LIST': {
+        const updates: Record<string, unknown> = {}
+        if (payload.name) updates.name = payload.name
+        if (payload.icon) updates.icon = payload.icon
+        if (payload.folder_id) updates.folder_id = payload.folder_id
+
         const { data, error } = await admin
           .from('task_lists')
-          .update({ name: payload.name })
+          .update(updates)
           .eq('id', payload.listId)
           .select('*')
           .single()
